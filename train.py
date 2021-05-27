@@ -23,7 +23,7 @@ from model_resnet import *
 
 
 import wandb
-wandb.init(entity="meta-learners", project="fsl_ssl")
+wandb.init(project="fsl_ssl")
 
 
 def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):    
@@ -36,32 +36,33 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
     else:
        raise ValueError('Unknown optimization, please define by yourself')
 
+    eval_interval = 20
     max_acc = 0       
     writer = SummaryWriter(log_dir=params.checkpoint_dir)
     for epoch in range(start_epoch,stop_epoch):
         model.train()
         model.train_loop(epoch, base_loader, optimizer, writer) #model are called by reference, no need to return 
-        model.eval()
+        if epoch % eval_interval == True or epoch == stop_epoch - 1: 
+            model.eval()
+            if not os.path.isdir(params.checkpoint_dir):
+                os.makedirs(params.checkpoint_dir)
 
-        if not os.path.isdir(params.checkpoint_dir):
-            os.makedirs(params.checkpoint_dir)
-
-        if params.jigsaw:
-            acc, acc_jigsaw = model.test_loop( val_loader)
-            writer.add_scalar('val/acc', acc, epoch)
-            writer.add_scalar('val/acc_jigsaw', acc_jigsaw, epoch)
-        elif params.rotation:
-            acc, acc_rotation = model.test_loop( val_loader)
-            writer.add_scalar('val/acc', acc, epoch)
-            writer.add_scalar('val/acc_rotation', acc_rotation, epoch)
-        else:    
-            acc = model.test_loop( val_loader)
-            writer.add_scalar('val/acc', acc, epoch)
-        if acc > max_acc : #for baseline and baseline++, we don't use validation here so we let acc = -1
-            print("best model! save...")
-            max_acc = acc
-            outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
-            torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
+            if params.jigsaw:
+            	acc, acc_jigsaw = model.test_loop( val_loader)
+            	writer.add_scalar('val/acc', acc, epoch)
+            	writer.add_scalar('val/acc_jigsaw', acc_jigsaw, epoch)
+            elif params.rotation:
+            	acc, acc_rotation = model.test_loop( val_loader)
+            	writer.add_scalar('val/acc', acc, epoch)
+            	writer.add_scalar('val/acc_rotation', acc_rotation, epoch)
+            else:    
+            	acc = model.test_loop( val_loader)
+            	writer.add_scalar('val/acc', acc, epoch)
+            if acc > max_acc : #for baseline and baseline++, we don't use validation here so we let acc = -1
+            	print("best model! save...")
+            	max_acc = acc
+            	outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
+            	torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
 
         if ((epoch+1) % params.save_freq==0) or (epoch==stop_epoch-1):
             outfile = os.path.join(params.checkpoint_dir, '{:d}.tar'.format(epoch))
