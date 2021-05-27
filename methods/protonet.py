@@ -10,6 +10,8 @@ from methods.meta_template import MetaTemplate
 from model_resnet import *
 from itertools import cycle
 
+import wandb
+
 class ProtoNet(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, jigsaw=False, lbda=0.0, rotation=False, tracking=False, use_bn=True, pretrain=False):
         super(ProtoNet, self).__init__(model_func,  n_way, n_support, use_bn, pretrain)
@@ -67,31 +69,32 @@ class ProtoNet(MetaTemplate):
                 if self.jigsaw:
                     loss_jigsaw, acc_jigsaw = self.set_forward_loss_unlabel(inputs[1][2], inputs[1][3])# torch.Size([5, 21, 9, 3, 75, 75]), torch.Size([5, 21])
                     loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_jigsaw
-                    writer.add_scalar('train/loss_proto', float(loss_proto.data.item()), self.global_count)
-                    writer.add_scalar('train/loss_jigsaw', float(loss_jigsaw.data.item()), self.global_count)
+                    wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
+                    wandb.log({'train/loss_jigsaw': float(loss_jigsaw.data.item())}, step=self.global_count)
+
                 elif self.rotation:
                     loss_rotation, acc_rotation = self.set_forward_loss_unlabel(inputs[1][2], inputs[1][3])# torch.Size([5, 21, 9, 3, 75, 75]), torch.Size([5, 21])
                     loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_rotation
-                    writer.add_scalar('train/loss_proto', float(loss_proto.data.item()), self.global_count)
-                    writer.add_scalar('train/loss_rotation', float(loss_rotation.data.item()), self.global_count)
+                    wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
+                    wandb.log({'train/loss_rotation': float(loss_rotation.data.item())}, step=self.global_count)
+
                 else:
                     loss = loss_proto
                 loss.backward()
                 optimizer.step()
                 avg_loss = avg_loss+loss.data
-                writer.add_scalar('train/loss', float(loss.data.item()), self.global_count)
+                wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
 
                 if self.jigsaw:
                     avg_loss_proto += loss_proto.data
                     avg_loss_jigsaw += loss_jigsaw.data
-                    writer.add_scalar('train/acc_proto', acc, self.global_count)
-                    writer.add_scalar('train/acc_jigsaw', acc_jigsaw, self.global_count)
+                    wandb.log({'train/acc_proto': acc}, step=self.global_count)
+                    wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
                 elif self.rotation:
                     avg_loss_proto += loss_proto.data
                     avg_loss_rotation += loss_rotation.data
-                    writer.add_scalar('train/acc_proto', acc, self.global_count)
-                    writer.add_scalar('train/acc_rotation', acc_rotation, self.global_count)
-
+                    wandb.log({'train/acc_proto': acc}, step=self.global_count)
+                    wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
                 if (i+1) % print_freq==0:
                     if self.jigsaw:
                         print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Jigsaw {:f}'.\
@@ -113,30 +116,30 @@ class ProtoNet(MetaTemplate):
                 if self.jigsaw:
                     loss_jigsaw, acc_jigsaw = self.set_forward_loss_unlabel(inputs[2], inputs[3])# torch.Size([5, 21, 9, 3, 75, 75]), torch.Size([5, 21])
                     loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_jigsaw
-                    writer.add_scalar('train/loss_proto', float(loss_proto.data.item()), self.global_count)
-                    writer.add_scalar('train/loss_jigsaw', float(loss_jigsaw.data.item()), self.global_count)
+                    wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
+                    wandb.log({'train/loss_jigsaw': float(loss_jigsaw.data.item())}, step=self.global_count)
                 elif self.rotation:
                     loss_rotation, acc_rotation = self.set_forward_loss_unlabel(inputs[2], inputs[3])# torch.Size([5, 21, 9, 3, 75, 75]), torch.Size([5, 21])
                     loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_rotation
-                    writer.add_scalar('train/loss_proto', float(loss_proto.data.item()), self.global_count)
-                    writer.add_scalar('train/loss_rotation', float(loss_rotation.data.item()), self.global_count)
+                    wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
+                    wandb.log({'train/loss_rotation': float(loss_rotation.data.item())}, step=self.global_count)
                 else:
                     loss = loss_proto
                 loss.backward()
                 optimizer.step()
                 avg_loss = avg_loss+loss.item()
-                writer.add_scalar('train/loss', float(loss.data.item()), self.global_count)
+                wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
 
                 if self.jigsaw:
                     avg_loss_proto += loss_proto.data
                     avg_loss_jigsaw += loss_jigsaw.data
-                    writer.add_scalar('train/acc_proto', acc, self.global_count)
-                    writer.add_scalar('train/acc_jigsaw', acc_jigsaw, self.global_count)
+                    wandb.log({'train/acc_proto': acc}, step=self.global_count)
+                    wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
                 elif self.rotation:
                     avg_loss_proto += loss_proto.data
                     avg_loss_rotation += loss_rotation.data
-                    writer.add_scalar('train/acc_proto', acc, self.global_count)
-                    writer.add_scalar('train/acc_rotation', acc_rotation, self.global_count)
+                    wandb.log({'train/acc_proto': acc}, step=self.global_count)
+                    wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
 
                 if (i+1) % print_freq==0:
                     #print(optimizer.state_dict()['param_groups'][0]['lr'])

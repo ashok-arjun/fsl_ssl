@@ -11,3 +11,5 @@ filelists/CUB/CUB_200_2011
 filelists/flowers/images
 filelists/dogs/images
 filelists/tieredImagenet/ILSVRC2015/*
+wandb/*
+

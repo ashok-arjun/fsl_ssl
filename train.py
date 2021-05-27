@@ -21,6 +21,11 @@ from tensorboardX import SummaryWriter
 import json
 from model_resnet import *
 
+
+import wandb
+wandb.init(entity="meta-learners", project="fsl_ssl")
+
+
 def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):    
     if params.optimization == 'Adam':
         optimizer = torch.optim.Adam(model.parameters(), lr=params.lr)

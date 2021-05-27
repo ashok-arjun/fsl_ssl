@@ -1,0 +1,28 @@
+{
+    "os": "Linux-5.4.104+-x86_64-with-debian-buster-sid",
+    "python": "3.7.6",
+    "heartbeatAt": "2021-05-27T07:09:42.542935",
+    "startedAt": "2021-05-27T07:09:41.089191",
+    "docker": null,
+    "gpu": "Tesla P100-PCIE-16GB",
+    "gpu_count": 1,
+    "cpu_count": 2,
+    "cuda": "10.1.243",
+    "args": [
+        "--dataset",
+        "CUB",
+        "--train_aug"
+    ],
+    "state": "running",
+    "codePath": "train.py",
+    "program": "train.py",
+    "git": {
+        "remote": "https://github.com/ashok-arjun/fsl_ssl",
+        "commit": "f8002288de7d1e7203ab50296dde85f30cc3d525"
+    },
+    "email": "arjun2000ashok@gmail.com",
+    "root": "/kaggle/working/fsl_ssl",
+    "host": "966b0594bf7b",
+    "username": "root",
+    "executable": "/opt/conda/bin/python"
+}
