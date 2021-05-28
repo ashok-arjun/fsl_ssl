@@ -15,4 +15,7 @@ wandb/*
 filelists/*
 CUB/*
 *.zip
-
+*.tar
+miniImageNet/
+*.jpg
+*.jpeg

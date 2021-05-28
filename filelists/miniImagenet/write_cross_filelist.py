@@ -5,9 +5,8 @@ import os
 import json
 import random
 import re
-
 cwd = os.getcwd() 
-data_path = '/kaggle/input/imagenet/imagenet/train'
+data_path = '/kaggle/working/fsl_ssl/filelists/miniImagenet/images'
 savedir = './'
 dataset_list = ['base', 'val', 'novel']
 

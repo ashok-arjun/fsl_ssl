@@ -7,7 +7,7 @@ import random
 import re
 
 cwd = os.getcwd() 
-data_path = '/kaggle/input/imagenet/imagenet/train'
+data_path = '/kaggle/working/fsl_ssl/filelists/miniImagenet/images'
 savedir = './'
 dataset_list = ['base', 'val', 'novel']
 
@@ -33,7 +33,7 @@ for dataset in dataset_list:
                 folderlist.append(label)
                 filelists[dataset][label] = []
                 fnames = listdir( join(data_path, label) )
-                fname_number = [ int(re.split('_|\.', fname)[1]) for fname in fnames]
+                fname_number = [ int(re.split('_|\.', fname)[]) for fname in fnames]
                 sorted_fnames = list(zip( *sorted(  zip(fnames, fname_number), key = lambda f_tuple: f_tuple[1] )))[0]
                  
             fid = int(fid[-5:])-1

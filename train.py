@@ -7,6 +7,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 import time
 import os
 import glob
+import random
 
 import backbone
 from data.datamgr import SimpleDataManager, SetDataManager
@@ -23,7 +24,7 @@ from model_resnet import *
 
 
 import wandb
-wandb.init(project="fsl_ssl")
+wandb.init(entity="meta-learners", project="fsl_ssl")
 
 
 def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):    
@@ -79,6 +80,7 @@ if __name__=='__main__':
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True
     
+   
     params = parse_args('train')
 
     isAircraft = (params.dataset == 'aircrafts')    
