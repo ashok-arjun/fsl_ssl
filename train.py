@@ -71,7 +71,14 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
     # return model
 
 if __name__=='__main__':
-    np.random.seed(10)
+    SEED = 10 
+    torch.manual_seed(SEED)
+    torch.cuda.manual_seed(SEED)
+    np.random.seed(SEED)
+    random.seed(SEED)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = True
+    
     params = parse_args('train')
 
     isAircraft = (params.dataset == 'aircrafts')    
