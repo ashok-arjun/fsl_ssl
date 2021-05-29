@@ -56,6 +56,8 @@ class ProtoNet(MetaTemplate):
         avg_loss_jigsaw=0
         avg_loss_rotation=0
 
+        self.global_count = epoch * len(train_loader)
+        
         if base_loader_u is not None:
 
             for i,inputs in enumerate(zip(train_loader,cycle(base_loader_u))):

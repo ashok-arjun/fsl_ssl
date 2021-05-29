@@ -232,9 +232,9 @@ if __name__=='__main__':
     
     # Init WANDB
     
-    if args.resume_wandb_id:
-        print('Resuming from wandb ID: ', args.resume_wandb_id)
-        wandb.init(entity="meta-learners", project="fsl_ssl", id=args.resume_wandb_id, resume=True)
+    if params.resume_wandb_id:
+        print('Resuming from wandb ID: ', params.resume_wandb_id)
+        wandb.init(entity="meta-learners", project="fsl_ssl", id=params.resume_wandb_id, resume=True)
     else:
         print('Fresh wandb run')
         wandb.init(entity="meta-learners", project="fsl_ssl")
