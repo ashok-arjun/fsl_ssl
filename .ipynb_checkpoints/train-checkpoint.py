@@ -24,7 +24,6 @@ from model_resnet import *
 
 
 import wandb
-wandb.init(entity="meta-learners", project="fsl_ssl")
 
 
 def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):    
@@ -157,7 +156,7 @@ if __name__=='__main__':
 
     model = model.cuda()
 
-    params.checkpoint_dir = 'checkpoints/%s/%s_%s_%s' %(params.dataset, params.date, params.model, params.method)
+    params.checkpoint_dir = 'ckpts/%s/%s_%s_%s' %(params.dataset, params.date, params.model, params.method)
     if params.train_aug:
         params.checkpoint_dir += '_aug'
     if not params.method  in ['baseline', 'baseline++']: 
@@ -229,6 +228,18 @@ if __name__=='__main__':
         model.load_state_dict(pretrained_dict, strict=False)
 
     json.dump(vars(params), open(params.checkpoint_dir+'/configs.json','w'))
+    
+    
+    # Init WANDB
+    
+    if args.resume_wandb_id:
+        print('Resuming from wandb ID: ', args.resume_wandb_id)
+        wandb.init(entity="meta-learners", project="fsl_ssl", id=args.resume_wandb_id, resume=True)
+    else:
+        print('Fresh wandb run')
+        wandb.init(entity="meta-learners", project="fsl_ssl")
+
+    
     train(base_loader, val_loader,  model, start_epoch, stop_epoch, params)
 
 
