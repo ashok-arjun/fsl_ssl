@@ -62,11 +62,11 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
             	print("best model! save...")
             	max_acc = acc
             	outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
-            	torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
+            	torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
 
         if ((epoch+1) % params.save_freq==0) or (epoch==stop_epoch-1):
             outfile = os.path.join(params.checkpoint_dir, '{:d}.tar'.format(epoch))
-            torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
+            torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
 
     # return model
 
