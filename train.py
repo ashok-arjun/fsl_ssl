@@ -153,7 +153,8 @@ if __name__=='__main__':
 
     else:
        raise ValueError('Unknown method')
-
+    
+    model = nn.DataParallel(model, device_ids = params.device_ids)
     model = model.cuda()
 
     params.checkpoint_dir = 'ckpts/%s/%s_%s_%s' %(params.dataset, params.date, params.model, params.method)
