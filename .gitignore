@@ -19,3 +19,6 @@ CUB/*
 miniImageNet/
 *.jpg
 *.jpeg
+ckpts/*
+wandb/*
+wandb/

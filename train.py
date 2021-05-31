@@ -154,7 +154,7 @@ if __name__=='__main__':
     else:
        raise ValueError('Unknown method')
     
-    model = nn.DataParallel(model, device_ids = params.device_ids)
+    # model = nn.DataParallel(model, device_ids = params.device_ids)
     model = model.cuda()
 
     params.checkpoint_dir = 'ckpts/%s/%s_%s_%s' %(params.dataset, params.date, params.model, params.method)
@@ -235,10 +235,10 @@ if __name__=='__main__':
     
     if params.resume_wandb_id:
         print('Resuming from wandb ID: ', params.resume_wandb_id)
-        wandb.init(entity="meta-learners", project="fsl_ssl", id=params.resume_wandb_id, resume=True)
+        wandb.init(project="fsl_ssl", id=params.resume_wandb_id, resume=True)
     else:
         print('Fresh wandb run')
-        wandb.init(entity="meta-learners", project="fsl_ssl")
+        wandb.init(project="fsl_ssl")
 
     
     train(base_loader, val_loader,  model, start_epoch, stop_epoch, params)
