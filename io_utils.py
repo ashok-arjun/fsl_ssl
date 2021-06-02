@@ -21,7 +21,7 @@ model_dict = dict(
 
 def parse_args(script):
     parser = argparse.ArgumentParser(description= 'few-shot script %s' %(script))
-    parser.add_argument('--dataset'     , default='miniImagenet',            help='CUB/cars/flowers/dogs/aircrafts/miniImagenet/tieredImagenet')
+    parser.add_argument('--dataset'     , default='dogs',            help='CUB/cars/flowers/dogs/aircrafts/miniImagenet/tieredImagenet')
     parser.add_argument('--model'       , default='resnet18',       help='model: Conv{4|6} / ResNet{10|18|34|50|101}') # 50 and 101 are not used in the paper
     parser.add_argument('--method'      , default='protonet',       help='baseline/baseline++/protonet/matchingnet/relationnet{_softmax}/maml{_approx}') #relationnet_softmax replace L2 norm with softmax to expedite training, maml_approx use first-order approximation in the gradient for efficiency
     parser.add_argument('--train_n_way' , default=5, type=int,      help='class num to classify for training') #baseline and baseline++ would ignore this parameter
@@ -39,7 +39,7 @@ def parse_args(script):
     parser.add_argument('--image_size'  , default=224, type=int,    help='224 is used in the paper')
     parser.add_argument('--date'        , default='', type=str,     help='date of the exp')
     parser.add_argument('--rotation'    , action='store_true',      help='multi-task training')
-    parser.add_argument('--tracking'    , action='store_true',      help='tracking batchnorm stats')
+    parser.add_argument('--tracking'    , action='store_true', default=True,     help='tracking batchnorm stats')
     parser.add_argument('--split'        , default='novel',         help='base/val/novel') #default novel, but you can also test base/val class accuracy if you want 
     parser.add_argument('--save_iter'    , default=-1, type=int,    help='saved feature from the model trained in x epoch, use the best model if x is -1')
     parser.add_argument('--adaptation'   , action='store_true',     help='further adaptation in test time or not')

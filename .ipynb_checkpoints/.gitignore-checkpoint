@@ -19,3 +19,8 @@ CUB/*
 miniImageNet/
 *.jpg
 *.jpeg
+ckpts/*
+wandb/*
+wandb/
+wandb/latest-run
+.ipynb_checkpoints/*
