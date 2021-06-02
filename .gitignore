@@ -22,3 +22,4 @@ miniImageNet/
 ckpts/*
 wandb/*
 wandb/
+wandb/latest-run

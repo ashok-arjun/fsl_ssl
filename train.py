@@ -83,6 +83,9 @@ if __name__=='__main__':
    
     params = parse_args('train')
 
+    os.environ["CUDA_VISIBLE_DEVICES"] = params.device
+
+
     isAircraft = (params.dataset == 'aircrafts')    
         
     base_file = os.path.join('filelists', params.dataset, params.base+'.json')

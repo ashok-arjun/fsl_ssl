@@ -22,7 +22,7 @@ model_dict = dict(
 def parse_args(script):
     parser = argparse.ArgumentParser(description= 'few-shot script %s' %(script))
     parser.add_argument('--dataset'     , default='miniImagenet',            help='CUB/cars/flowers/dogs/aircrafts/miniImagenet/tieredImagenet')
-    parser.add_argument('--model'       , default='ResNet18',       help='model: Conv{4|6} / ResNet{10|18|34|50|101}') # 50 and 101 are not used in the paper
+    parser.add_argument('--model'       , default='resnet18',       help='model: Conv{4|6} / ResNet{10|18|34|50|101}') # 50 and 101 are not used in the paper
     parser.add_argument('--method'      , default='protonet',       help='baseline/baseline++/protonet/matchingnet/relationnet{_softmax}/maml{_approx}') #relationnet_softmax replace L2 norm with softmax to expedite training, maml_approx use first-order approximation in the gradient for efficiency
     parser.add_argument('--train_n_way' , default=5, type=int,      help='class num to classify for training') #baseline and baseline++ would ignore this parameter
     parser.add_argument('--test_n_way'  , default=5, type=int,      help='class num to classify for testing (validation) ') #baseline and baseline++ only use this parameter in finetuning
@@ -63,12 +63,12 @@ def parse_args(script):
         parser.add_argument('--resume'      , action='store_true',  help='continue from previous trained model with largest epoch')
         parser.add_argument('--resume_wandb_id'      , default=None,  help='wandb ID')
         parser.add_argument('--warmup'      , action='store_true',  help='continue from baseline, neglected if resume is true') #never used in the paper
+        parser.add_argument('--device'      ,  default="0", type=str, help='GPU id')
 
     parser.add_argument('--layer', default=-1, type=int)
         
 
     return parser.parse_args()
-
 
 def get_assigned_file(checkpoint_dir,num):
     assign_file = os.path.join(checkpoint_dir, '{:d}.tar'.format(num))
