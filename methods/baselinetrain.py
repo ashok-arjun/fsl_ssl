@@ -9,6 +9,8 @@ import torch.nn.functional as F
 from model_resnet import *
 from resnet_pytorch import *
 
+import wandb
+
 class BaselineTrain(nn.Module):
     def __init__(self, model_func, num_class, loss_type = 'softmax', jigsaw=False, lbda=0.0, rotation=False, tracking=True, pretrain=False):
         super(BaselineTrain, self).__init__()
@@ -159,35 +161,46 @@ class BaselineTrain(nn.Module):
                     loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_jigsaw
                     writer.add_scalar('train/loss_proto', float(loss_proto.data.item()), self.global_count)
                     writer.add_scalar('train/loss_jigsaw', float(loss_jigsaw), self.global_count)
+                    wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
+                    wandb.log({'train/loss_jigsaw': float(loss_jigsaw.data.item())}, step=self.global_count)
                 elif self.rotation:
                     loss_rotation, acc_rotation = self.forward_loss(patches=inputs[1][2], patches_label=inputs[1][3], unlabel_only=True)
                     loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_rotation
                     writer.add_scalar('train/loss_proto', float(loss_proto.data.item()), self.global_count)
                     writer.add_scalar('train/loss_rotation', float(loss_rotation), self.global_count)
+                    wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
+                    wandb.log({'train/loss_rotation': float(loss_rotation.data.item())}, step=self.global_count)
                 else:
                     loss, acc = self.forward_loss(x,y)
                 writer.add_scalar('train/loss', float(loss.data.item()), self.global_count)
+                wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
                 loss.backward()
                 optimizer.step()
 
                 if scheduler is not None:
                     scheduler.step()
                     writer.add_scalar('train/lr', optimizer.param_groups[0]['lr'], self.global_count)
+                    wandb.log({'train/lr': optimizer.param_groups[0]['lr']}, step=self.global_count)
 
                 avg_loss = avg_loss+loss.data#[0]
                 avg_acc_proto = avg_acc_proto+acc
 
                 writer.add_scalar('train/acc_cls', acc, self.global_count)
+                wandb.log({'train/acc_cls': acc}, step=self.global_count)
+
                 if self.jigsaw:
                     avg_loss_proto += loss_proto.data
                     avg_loss_jigsaw += loss_jigsaw
                     avg_acc_jigsaw = avg_acc_jigsaw+acc_jigsaw
                     writer.add_scalar('train/acc_jigsaw', acc_jigsaw, self.global_count)
+                    wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
                 elif self.rotation:
                     avg_loss_proto += loss_proto.data
                     avg_loss_rotation += loss_rotation
                     avg_acc_rotation = avg_acc_rotation+acc_rotation
                     writer.add_scalar('train/acc_rotation', acc_rotation, self.global_count)
+                    wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
+
 
                 if (i+1) % print_freq==0:
                     if self.jigsaw:
@@ -213,35 +226,44 @@ class BaselineTrain(nn.Module):
                     loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_jigsaw
                     writer.add_scalar('train/loss_proto', float(loss_proto.data.item()), self.global_count)
                     writer.add_scalar('train/loss_jigsaw', float(loss_jigsaw), self.global_count)
+                    wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
+                    wandb.log({'train/loss_jigsaw': float(loss_jigsaw.data.item())}, step=self.global_count)
                 elif self.rotation:
                     loss_proto, loss_rotation, acc, acc_rotation = self.forward_loss(x, y, inputs[2], inputs[3])
                     loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_rotation
                     writer.add_scalar('train/loss_proto', float(loss_proto.data.item()), self.global_count)
                     writer.add_scalar('train/loss_rotation', float(loss_rotation), self.global_count)
+                    wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
+                    wandb.log({'train/loss_rotation': float(loss_rotation.data.item())}, step=self.global_count)
                 else:
                     loss, acc = self.forward_loss(x,y)
                 writer.add_scalar('train/loss', float(loss.data.item()), self.global_count)
+                wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
                 loss.backward()
                 optimizer.step()
 
                 if scheduler is not None:
                     scheduler.step()
                     writer.add_scalar('train/lr', optimizer.param_groups[0]['lr'], self.global_count)
+                    wandb.log({'train/lr': optimizer.param_groups[0]['lr']}, step=self.global_count)
 
                 avg_loss = avg_loss+loss.data
                 avg_acc_proto = avg_acc_proto+acc
 
                 writer.add_scalar('train/acc_cls', acc, self.global_count)
+                wandb.log({'train/acc_cls': acc}, step=self.global_count)
                 if self.jigsaw:
                     avg_loss_proto += loss_proto.data
                     avg_loss_jigsaw += loss_jigsaw
                     avg_acc_jigsaw = avg_acc_jigsaw+acc_jigsaw
                     writer.add_scalar('train/acc_jigsaw', acc_jigsaw, self.global_count)
+                    wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
                 elif self.rotation:
                     avg_loss_proto += loss_proto.data
                     avg_loss_rotation += loss_rotation
                     avg_acc_rotation = avg_acc_rotation+acc_rotation
                     writer.add_scalar('train/acc_rotation', acc_rotation, self.global_count)
+                    wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
 
                 if (i+1) % print_freq==0:
                     if self.jigsaw:
@@ -283,6 +305,7 @@ class BaselineTrain(nn.Module):
             if self.jigsaw or self.rotation:
                 return num_correct*100.0/num_total, num_correct_jigsaw*100.0/num_total_jigsaw
             else:
+                print("Validation loader inside BaselineTrain: ", num_correct*100.0/num_total)
                 return num_correct*100.0/num_total
 
         else:
