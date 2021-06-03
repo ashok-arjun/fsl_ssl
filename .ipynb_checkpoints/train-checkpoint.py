@@ -58,15 +58,18 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
             else:    
             	acc = model.test_loop( val_loader)
             	writer.add_scalar('val/acc', acc, epoch)
+            wandb.log({"val/acc": acc}, step=model.global_count)
             if acc > max_acc : #for baseline and baseline++, we don't use validation here so we let acc = -1
             	print("best model! save...")
             	max_acc = acc
             	outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
-            	torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
+            	torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
+            	wandb.save(outfile)
 
         if ((epoch+1) % params.save_freq==0) or (epoch==stop_epoch-1):
             outfile = os.path.join(params.checkpoint_dir, '{:d}.tar'.format(epoch))
-            torch.save({'epoch':epoch, 'state':model.state_dict()}, outfile)
+            torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
+            wandb.save(outfile)
 
     # return model
 
@@ -81,6 +84,9 @@ if __name__=='__main__':
     
    
     params = parse_args('train')
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = params.device
+
 
     isAircraft = (params.dataset == 'aircrafts')    
         
@@ -131,7 +137,7 @@ if __name__=='__main__':
         val_loader              = val_datamgr.get_data_loader( val_file, aug = False) 
 
         if params.method == 'protonet':
-            model           = ProtoNet( model_dict[params.model], **train_few_shot_params, use_bn=(not params.no_bn), pretrain=params.pretrain)
+            model           = ProtoNet( model_dict[params.model], **train_few_shot_params, use_bn=(not params.no_bn), pretrain=params.pretrain, tracking=params.tracking)
         elif params.method == 'matchingnet':
             model           = MatchingNet( model_dict[params.model], **train_few_shot_params )
         elif params.method in ['relationnet', 'relationnet_softmax']:
@@ -153,7 +159,8 @@ if __name__=='__main__':
 
     else:
        raise ValueError('Unknown method')
-
+    
+    # model = nn.DataParallel(model, device_ids = params.device_ids)
     model = model.cuda()
 
     params.checkpoint_dir = 'ckpts/%s/%s_%s_%s' %(params.dataset, params.date, params.model, params.method)
@@ -234,10 +241,10 @@ if __name__=='__main__':
     
     if params.resume_wandb_id:
         print('Resuming from wandb ID: ', params.resume_wandb_id)
-        wandb.init(entity="meta-learners", project="fsl_ssl", id=params.resume_wandb_id, resume=True)
+        wandb.init(project="fsl_ssl", id=params.resume_wandb_id, resume=True)
     else:
         print('Fresh wandb run')
-        wandb.init(entity="meta-learners", project="fsl_ssl")
+        wandb.init(project="fsl_ssl")
 
     
     train(base_loader, val_loader,  model, start_epoch, stop_epoch, params)
