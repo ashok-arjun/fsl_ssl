@@ -45,7 +45,7 @@ def feature_evaluation(cl_data_file, model, n_way = 5, n_support = 5, n_query = 
 
 if __name__ == '__main__':
     
-    SEED = 10 
+    SEED = 2021 
     torch.manual_seed(SEED)
     torch.cuda.manual_seed(SEED)
     np.random.seed(SEED)
@@ -181,7 +181,6 @@ if __name__ == '__main__':
         cl_data_file = feat_loader.init_loader(novel_file)
 
         for i in range(iter_num):
-            print(i)
             acc = feature_evaluation(cl_data_file, model, n_query = params.n_query, adaptation = params.adaptation, **few_shot_params)
             acc_all.append(acc)
 
