@@ -44,6 +44,15 @@ def feature_evaluation(cl_data_file, model, n_way = 5, n_support = 5, n_query = 
     return acc
 
 if __name__ == '__main__':
+    
+    SEED = 10 
+    torch.manual_seed(SEED)
+    torch.cuda.manual_seed(SEED)
+    np.random.seed(SEED)
+    random.seed(SEED)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = True
+    
     params = parse_args('test')
 
     isAircraft = (params.dataset == 'aircrafts')
@@ -93,21 +102,22 @@ if __name__ == '__main__':
     model = model.cuda()
     model.feature = model.feature.cuda()
 
-    if params.json_seed is not None:
-        checkpoint_dir = 'checkpoints/%s_%s/%s_%s_%s' %(params.dataset, params.json_seed, params.date, params.model, params.method)
-    else:
-        checkpoint_dir = 'checkpoints/%s/%s_%s_%s' %(params.dataset, params.date, params.model, params.method)
+    checkpoint_dir = 'ckpts/%s/%s_%s_%s' %(params.dataset, params.date, params.model, params.method)
     if params.train_aug:
         checkpoint_dir += '_aug'
     if not params.method in ['baseline', 'baseline++'] :
         checkpoint_dir += '_%dway_%dshot_%dquery' %( params.train_n_way, params.n_shot, params.n_query)
 
-    checkpoint_dir += '_%d'%params.image_size
+#     checkpoint_dir += '_%d'%params.image_size
 
     ## Use another dataset (dataloader) for unlabeled data
     if params.dataset_unlabel is not None:
         checkpoint_dir += params.dataset_unlabel
         checkpoint_dir += str(params.bs)
+        
+    ## Track bn stats
+    if params.tracking:
+        checkpoint_dir += '_tracking'
 
     ## Use grey image
     if params.grey:
@@ -166,11 +176,12 @@ if __name__ == '__main__':
         acc_mean, acc_std = model.test_loop( novel_loader, return_std = True)
 
     else:
-        novel_file = os.path.join( checkpoint_dir.replace("checkpoints","features"), split_str +".hdf5") #defaut split = novel, but you can also test base or val classes
+        novel_file = os.path.join( checkpoint_dir.replace("ckpts","features"), split_str +".hdf5") #defaut split = novel, but you can also test base or val classes
         print('novel_file',novel_file)
         cl_data_file = feat_loader.init_loader(novel_file)
 
         for i in range(iter_num):
+            print(i)
             acc = feature_evaluation(cl_data_file, model, n_query = params.n_query, adaptation = params.adaptation, **few_shot_params)
             acc_all.append(acc)
 
@@ -180,10 +191,10 @@ if __name__ == '__main__':
         print('%d Test Acc = %4.2f%% +- %4.2f%%' %(iter_num, acc_mean, 1.96* acc_std/np.sqrt(iter_num)))
 
     if params.method in ['maml', 'maml_approx']:
-    	if not os.path.isdir(checkpoint_dir.replace("checkpoints","features")):
-		    os.mkdir(checkpoint_dir.replace("checkpoints","features"))
+        if not os.path.isdir(checkpoint_dir.replace("ckpts","features")):
+            os.mkdir(checkpoint_dir.replace("ckpts","features"))
 
-    with open(os.path.join( checkpoint_dir.replace("checkpoints","features"), split_str +"_test.txt") , 'a') as f:
+    with open(os.path.join( checkpoint_dir.replace("ckpts","features"), split_str +"_test.txt") , 'a') as f:
         timestamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
         aug_str = '-aug' if params.train_aug else ''
         aug_str += '-adapted' if params.adaptation else ''
