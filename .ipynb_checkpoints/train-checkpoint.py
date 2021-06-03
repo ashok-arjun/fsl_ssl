@@ -289,7 +289,7 @@ if __name__=='__main__':
             model.feature.load_state_dict(tmp['state'])
         print('modelfile:',modelfile)
 
-        datamgr          = SetDataManager(image_size, n_eposide = iter_num, n_query = 15 , **few_shot_params, isAircraft=isAircraft)
+        datamgr          = SetDataManager(image_size, n_eposide = iter_num, n_query = params.n_query , **few_shot_params, isAircraft=isAircraft)
         loadfile         = os.path.join('filelists', params.dataset, 'novel.json')
         novel_loader     = datamgr.get_data_loader( loadfile, aug = False)
         if params.adaptation:

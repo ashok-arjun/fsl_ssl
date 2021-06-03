@@ -236,20 +236,20 @@ if __name__=='__main__':
         print('Load model from:',params.loadfile)
         model.load_state_dict(pretrained_dict, strict=False)
 
-    # json.dump(vars(params), open(params.checkpoint_dir+'/configs.json','w'))
+    json.dump(vars(params), open(params.checkpoint_dir+'/configs.json','w'))
     
     
-    # # Init WANDB
+    # Init WANDB
     
-    # if params.resume_wandb_id:
-    #     print('Resuming from wandb ID: ', params.resume_wandb_id)
-    #     wandb.init(project="fsl_ssl", id=params.resume_wandb_id, resume=True)
-    # else:
-    #     print('Fresh wandb run')
-    #     wandb.init(project="fsl_ssl")
+    if params.resume_wandb_id:
+        print('Resuming from wandb ID: ', params.resume_wandb_id)
+        wandb.init(project="fsl_ssl", id=params.resume_wandb_id, resume=True)
+    else:
+        print('Fresh wandb run')
+        wandb.init(project="fsl_ssl")
 
     
-    # train(base_loader, val_loader,  model, start_epoch, stop_epoch, params)
+    train(base_loader, val_loader,  model, start_epoch, stop_epoch, params)
 
 
     ##### from save_features.py (except maml)#####
