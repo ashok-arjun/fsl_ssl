@@ -59,9 +59,11 @@ def train(base_loader, val_loader, model, optimizer, start_epoch, stop_epoch, pa
             	wandb.save(outfile)
 
         if ((epoch+1) % params.save_freq==0) or (epoch==stop_epoch-1):
-            outfile = os.path.join(params.checkpoint_dir, 'last_model.tar'.format(epoch))
+            outfile = os.path.join(params.checkpoint_dir, '{:d}.tar'.format(epoch))
+            outfile_2 = os.path.join(params.checkpoint_dir, 'last_model.tar')
             torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)   
-            wandb.save(outfile)
+            torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile_2)   
+            wandb.save(outfile_2)
             
     # only two models are uploaded in each run - the best one and the last one
     # return model
