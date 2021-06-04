@@ -45,7 +45,7 @@ def feature_evaluation(cl_data_file, model, n_way = 5, n_support = 5, n_query = 
 
 if __name__ == '__main__':
     
-    SEED = 2021 
+    SEED = 10 
     torch.manual_seed(SEED)
     torch.cuda.manual_seed(SEED)
     np.random.seed(SEED)

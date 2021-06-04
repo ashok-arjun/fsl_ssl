@@ -77,7 +77,7 @@ if __name__=='__main__':
     # torch.backends.cudnn.deterministic = True
     # torch.backends.cudnn.benchmark = True
     
-    committed = input("Have you committed before invoking this file? <y/n>") # important for training
+    committed = input("Have you committed RIGHT before invoking this file? <y/n>") # important for training
     if(committed == "n"):
         exit()
    

@@ -4,6 +4,7 @@ from torch.autograd import Variable
 import os
 import glob
 import h5py
+import random
 
 import backbone
 from data.datamgr import SimpleDataManager
@@ -40,6 +41,15 @@ def save_features(model, data_loader, outfile ):
     f.close()
 
 if __name__ == '__main__':
+
+    SEED = 10 
+    torch.manual_seed(SEED)
+    torch.cuda.manual_seed(SEED)
+    np.random.seed(SEED)
+    random.seed(SEED)
+    # torch.backends.cudnn.deterministic = True
+    # torch.backends.cudnn.benchmark = True
+
     params = parse_args('save_features')
 
     isAircraft = (params.dataset == 'aircrafts')
