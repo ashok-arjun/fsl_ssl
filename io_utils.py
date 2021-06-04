@@ -27,7 +27,7 @@ def parse_args(script):
     parser.add_argument('--train_n_way' , default=5, type=int,      help='class num to classify for training') #baseline and baseline++ would ignore this parameter
     parser.add_argument('--test_n_way'  , default=5, type=int,      help='class num to classify for testing (validation) ') #baseline and baseline++ only use this parameter in finetuning
     parser.add_argument('--n_shot'      , default=5, type=int,      help='number of labeled data in each class, same as n_support') #baseline and baseline++ only use this parameter in finetuning
-    parser.add_argument('--train_aug'   , action='store_true',      help='perform data augmentation or not during training ') #still required for save_features.py and test.py to find the model path correctly
+    parser.add_argument('--train_aug'   , default=True, action='store_true',      help='perform data augmentation or not during training ') #still required for save_features.py and test.py to find the model path correctly
     parser.add_argument('--jigsaw'      , action='store_true',      help='multi-task training')
     parser.add_argument('--lbda'        , default=0.5, type=float,  help='lambda for the jigsaw loss, (1-lambda) for proto loss')
     parser.add_argument('--lr'          , default=0.001, type=float,help='learning rate')
@@ -60,9 +60,9 @@ def parse_args(script):
         parser.add_argument('--save_freq'   , default=10, type=int,help='Save frequency')
         parser.add_argument('--start_epoch' , default=0, type=int,  help='Starting epoch')
         parser.add_argument('--stop_epoch'  , default=600, type=int,help='Stopping epoch') # for meta-learning methods, each epoch contains 100 episodes
-        parser.add_argument('--resume'      , action='store_true',  help='continue from previous trained model with largest epoch')
-        parser.add_argument('--resume_wandb_filename', help='wandb resume filename') # NOTE: --resume is overridden by this
-        parser.add_argument('--resume_wandb_id'      , help='wandb resume ID')
+        parser.add_argument('-r', '--resume'      , action='store_true',  help='continue from previous trained model with largest epoch')
+        parser.add_argument('-rwf', '--resume_wandb_filename', help='wandb resume filename') # NOTE: --resume is overridden by this
+        parser.add_argument('-rwi', '--resume_wandb_id'      , help='wandb resume ID')
         parser.add_argument('--warmup'      , action='store_true',  help='continue from baseline, neglected if resume is true') #never used in the paper
         parser.add_argument('--device'      ,  default="0", type=str, help='GPU id')
 

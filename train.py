@@ -220,6 +220,10 @@ if __name__=='__main__':
         stop_epoch = params.stop_epoch * model.n_task #maml use multiple tasks in one update 
 
     if params.resume_wandb_filename:
+        if not params.resume_wandb_id:
+            print('Wandb ID not given, but filename given. Exiting')
+            exit()
+        print('resume_wandb_filename : "%s" will override resume' % (params.resume_wandb_filename))
         params.resume = wandb.restore(params.resume_wandb_filename)
 
     if params.resume:
