@@ -61,7 +61,8 @@ def parse_args(script):
         parser.add_argument('--start_epoch' , default=0, type=int,  help='Starting epoch')
         parser.add_argument('--stop_epoch'  , default=600, type=int,help='Stopping epoch') # for meta-learning methods, each epoch contains 100 episodes
         parser.add_argument('--resume'      , action='store_true',  help='continue from previous trained model with largest epoch')
-        parser.add_argument('--resume_wandb_id'      , default=None,  help='wandb ID')
+        parser.add_argument('--resume_wandb_filename', help='wandb resume filename') # NOTE: --resume is overridden by this
+        parser.add_argument('--resume_wandb_id'      , help='wandb resume ID')
         parser.add_argument('--warmup'      , action='store_true',  help='continue from baseline, neglected if resume is true') #never used in the paper
         parser.add_argument('--device'      ,  default="0", type=str, help='GPU id')
 

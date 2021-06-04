@@ -50,7 +50,7 @@ def train(base_loader, val_loader, model, optimizer, start_epoch, stop_epoch, pa
             else:    
             	acc = model.test_loop( val_loader)
             	writer.add_scalar('val/acc', acc, epoch)
-            wandb.log({"val/acc": acc}, step=model.global_count)
+            if acc: wandb.log({"val/acc": acc}, step=model.global_count)
             if acc > max_acc : #for baseline and baseline++, we don't use validation here so we let acc = -1
             	print("best model! save...")
             	max_acc = acc
@@ -170,6 +170,17 @@ if __name__=='__main__':
        raise ValueError('Unknown optimization, please define by yourself')
     
     # ---
+
+    # Init WANDB
+    
+    if params.resume_wandb_id:
+        print('Resuming from wandb ID: ', params.resume_wandb_id)
+        wandb.init(project="fsl_ssl", id=params.resume_wandb_id, resume=True)
+    else:
+        print('Fresh wandb run')
+        wandb.init(project="fsl_ssl")
+
+    ###
     
     params.checkpoint_dir = 'ckpts/%s/%s_%s_%s' %(params.dataset, params.date, params.model, params.method)
     if params.train_aug:
@@ -208,6 +219,9 @@ if __name__=='__main__':
     if params.method == 'maml' or params.method == 'maml_approx' :
         stop_epoch = params.stop_epoch * model.n_task #maml use multiple tasks in one update 
 
+    if params.resume_wandb_filename:
+        params.resume = wandb.restore(params.resume_wandb_filename)
+
     if params.resume:
         resume_file = get_resume_file(params.checkpoint_dir)
         if resume_file is not None:
@@ -243,14 +257,7 @@ if __name__=='__main__':
 
     json.dump(vars(params), open(params.checkpoint_dir+'/configs.json','w'))    
     
-    # Init WANDB
     
-    if params.resume_wandb_id:
-        print('Resuming from wandb ID: ', params.resume_wandb_id)
-        wandb.init(project="fsl_ssl", id=params.resume_wandb_id, resume=True)
-    else:
-        print('Fresh wandb run')
-        wandb.init(project="fsl_ssl")
 
     
     train(base_loader, val_loader,  model, optimizer, start_epoch, stop_epoch, params)
