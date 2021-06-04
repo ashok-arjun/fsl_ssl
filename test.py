@@ -50,8 +50,8 @@ if __name__ == '__main__':
     torch.cuda.manual_seed(SEED)
     np.random.seed(SEED)
     random.seed(SEED)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = True
+    # torch.backends.cudnn.deterministic = True
+    # torch.backends.cudnn.benchmark = True
     
     params = parse_args('test')
 

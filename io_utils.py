@@ -44,7 +44,7 @@ def parse_args(script):
     parser.add_argument('--save_iter'    , default=-1, type=int,    help='saved feature from the model trained in x epoch, use the best model if x is -1')
     parser.add_argument('--adaptation'   , action='store_true',     help='further adaptation in test time or not')
 
-    parser.add_argument('--bs'          , default=16, type=int,     help='batch size used for unlabeled dataset, also when method==baseline')
+    parser.add_argument('--bs'          , default=64, type=int,     help='batch size used for unlabeled dataset, also when method==baseline')
     parser.add_argument('--no_bn'        , action='store_true',     help='not using batch norm if True')
     parser.add_argument('--pretrain'     , action='store_true',     help='use imagenet pre-train model')
     parser.add_argument('--grey'     , action='store_true',         help='use grey iamge')
@@ -80,7 +80,7 @@ def get_resume_file(checkpoint_dir):
     if len(filelist) == 0:
         return None
 
-    filelist =  [ x  for x in filelist if os.path.basename(x) != 'best_model.tar' ]
+    filelist =  [ x  for x in filelist if os.path.basename(x) != 'best_model.tar' and  os.path.basename(x) != 'last_model.tar']
     epochs = np.array([int(os.path.splitext(os.path.basename(x))[0]) for x in filelist])
     max_epoch = np.max(epochs)
     resume_file = os.path.join(checkpoint_dir, '{:d}.tar'.format(max_epoch))
