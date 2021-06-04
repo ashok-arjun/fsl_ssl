@@ -177,6 +177,8 @@ class MAML(MetaTemplate):
         loss_all = []
         optimizer.zero_grad()
 
+        self.global_count = epoch * len(train_loader)
+        
         #train
         for i, inputs in enumerate(train_loader):
             self.global_count += 1

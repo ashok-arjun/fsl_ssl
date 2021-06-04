@@ -209,6 +209,7 @@ if __name__=='__main__':
     if params.resume:
         resume_file = get_resume_file(params.checkpoint_dir)
         if resume_file is not None:
+            print('Resuming model, epoch and optimizer from: ', resume_file)
             tmp = torch.load(resume_file)
             start_epoch = tmp['epoch']+1
             model.load_state_dict(tmp['state'])

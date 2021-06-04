@@ -147,6 +147,8 @@ class BaselineTrain(nn.Module):
         avg_acc_proto=0
         avg_acc_jigsaw=0
         avg_acc_rotation=0
+        
+        self.global_count = epoch * len(train_loader)
 
         if base_loader_u is not None:
             for i,inputs in enumerate(zip(train_loader,base_loader_u)):

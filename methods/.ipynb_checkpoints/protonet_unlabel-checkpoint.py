@@ -53,6 +53,10 @@ class ProtoNet(MetaTemplate):
         avg_loss_proto=0
         avg_loss_jigsaw=0
         avg_loss_rotation=0
+        
+        self.global_count = epoch * len(train_loader)
+        
+        
         for i, inputs in enumerate(train_loader):
             self.global_count += 1
             x = inputs[0]
