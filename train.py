@@ -77,6 +77,9 @@ if __name__=='__main__':
     # torch.backends.cudnn.deterministic = True
     # torch.backends.cudnn.benchmark = True
     
+    committed = input("Have you committed before invoking this file? <y/n>") # important for training
+    if(committed == "n"):
+        exit()
    
     params = parse_args('train')
 
@@ -175,10 +178,10 @@ if __name__=='__main__':
     
     if params.resume_wandb_id:
         print('Resuming from wandb ID: ', params.resume_wandb_id)
-        wandb.init(project="fsl_ssl", id=params.resume_wandb_id, resume=True)
+        wandb.init(config=vars(params), project="fsl_ssl", id=params.resume_wandb_id, resume=True)
     else:
         print('Fresh wandb run')
-        wandb.init(project="fsl_ssl")
+        wandb.init(config=vars(params), project="fsl_ssl")
 
     ###
     
@@ -260,9 +263,6 @@ if __name__=='__main__':
         model.load_state_dict(checkpoint['state'])
 
     json.dump(vars(params), open(params.checkpoint_dir+'/configs.json','w'))    
-    
-    
-
     
     train(base_loader, val_loader,  model, optimizer, start_epoch, stop_epoch, params)
 
