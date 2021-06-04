@@ -26,16 +26,8 @@ from model_resnet import *
 import wandb
 
 
-def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):    
-    if params.optimization == 'Adam':
-        optimizer = torch.optim.Adam(model.parameters(), lr=params.lr)
-    elif params.optimization == 'SGD':
-        optimizer = torch.optim.SGD(model.parameters(), lr=params.lr)
-    elif params.optimization == 'Nesterov':
-        optimizer = torch.optim.SGD(model.parameters(), lr=params.lr, nesterov=True, momentum=0.9, weight_decay=params.wd)
-    else:
-       raise ValueError('Unknown optimization, please define by yourself')
-
+def train(base_loader, val_loader, model, optimizer, start_epoch, stop_epoch, params):    
+    
     eval_interval = 20
     max_acc = 0       
     writer = SummaryWriter(log_dir=params.checkpoint_dir)
@@ -67,17 +59,10 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
             	wandb.save(outfile)
 
         if ((epoch+1) % params.save_freq==0) or (epoch==stop_epoch-1):
-            outfile = os.path.join(params.checkpoint_dir, '{:d}.tar'.format(epoch))
-            torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
+            outfile = os.path.join(params.checkpoint_dir, 'last_model.tar'.format(epoch))
+            torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)   
+            wandb.save(outfile)
             
-            # save the latest file as "last_model.tar"
-            
-            os.rename(outfile, os.path.join(params.checkpoint_dir, 'last_model.tar'))        
-            wandb.save(os.path.join(params.checkpoint_dir, 'last_model.tar'))
-            os.rename(os.path.join(params.checkpoint_dir, 'last_model.tar'), outfile)      
-            
-    wandb.save(os.path.join(params.checkpoint_dir, 'best_model.tar'))
-
     # only two models are uploaded in each run - the best one and the last one
     # return model
 
@@ -171,6 +156,19 @@ if __name__=='__main__':
     # model = nn.DataParallel(model, device_ids = params.device_ids)
     model = model.cuda()
 
+    # Arjun - defined optimizer here
+    
+    if params.optimization == 'Adam':
+        optimizer = torch.optim.Adam(model.parameters(), lr=params.lr)
+    elif params.optimization == 'SGD':
+        optimizer = torch.optim.SGD(model.parameters(), lr=params.lr)
+    elif params.optimization == 'Nesterov':
+        optimizer = torch.optim.SGD(model.parameters(), lr=params.lr, nesterov=True, momentum=0.9, weight_decay=params.wd)
+    else:
+       raise ValueError('Unknown optimization, please define by yourself')
+    
+    # ---
+    
     params.checkpoint_dir = 'ckpts/%s/%s_%s_%s' %(params.dataset, params.date, params.model, params.method)
     if params.train_aug:
         params.checkpoint_dir += '_aug'
@@ -214,6 +212,7 @@ if __name__=='__main__':
             tmp = torch.load(resume_file)
             start_epoch = tmp['epoch']+1
             model.load_state_dict(tmp['state'])
+            optimizer.load_state_dict(tmp['optimizer'])
             del tmp
     elif params.warmup: #We also support warmup from pretrained baseline feature, but we never used in our paper
         baseline_checkpoint_dir = 'checkpoints/%s/%s_%s' %(params.dataset, params.model, 'baseline')
@@ -237,13 +236,9 @@ if __name__=='__main__':
     if params.loadfile != '':
         print('Loading model from: ' + params.loadfile)
         checkpoint = torch.load(params.loadfile)
-        ## remove last layer for baseline
-        pretrained_dict = {k: v for k, v in checkpoint['state'].items() if 'classifier' not in k and 'loss_fn' not in k}
-        print('Load model from:',params.loadfile)
-        model.load_state_dict(pretrained_dict, strict=False)
+        model.load_state_dict(checkpoint['state'])
 
-    json.dump(vars(params), open(params.checkpoint_dir+'/configs.json','w'))
-    
+    json.dump(vars(params), open(params.checkpoint_dir+'/configs.json','w'))    
     
     # Init WANDB
     
@@ -255,7 +250,7 @@ if __name__=='__main__':
         wandb.init(project="fsl_ssl")
 
     
-    train(base_loader, val_loader,  model, start_epoch, stop_epoch, params)
+    train(base_loader, val_loader,  model, optimizer, start_epoch, stop_epoch, params)
 
 
     ##### from save_features.py (except maml)#####
