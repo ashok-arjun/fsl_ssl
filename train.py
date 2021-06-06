@@ -76,14 +76,19 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
     # return model
 
 if __name__=='__main__':
-    SEED = 10 
+    SEED = 42
     torch.manual_seed(SEED)
     torch.cuda.manual_seed(SEED)
+    torch.cuda.manual_seed_all(SEED)
     np.random.seed(SEED)
     random.seed(SEED)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = True
+    os.environ['PYTHONHASHSEED'] = str(SEED)
+#     torch.backends.cudnn.deterministic = True
+#     torch.backends.cudnn.benchmark = True
     
+    if not params.committed:
+        print("Not --committed")
+        exit()
    
     params = parse_args('train')
 

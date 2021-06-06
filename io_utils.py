@@ -54,6 +54,7 @@ def parse_args(script):
     parser.add_argument('--base'     , default='base',              help='name of the json file of the base set')
     parser.add_argument('--base_unlabel'     , default='base',      help='name of the json file of the base set for unlabeled dataset dataloader')
     # parser.add_argument("--device_ids", nargs="+", required=True, type=int) # [0] can be set as default
+    parser.add_argument('--committed'      ,  action='store_true', help='Have you committed?')
 
     if script == 'train':
         parser.add_argument('--num_classes' , default=200, type=int,help='total number of classes in softmax, only used in baseline') #make it larger than the maximum label value in base class
