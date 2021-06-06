@@ -42,6 +42,8 @@ def save_features(model, data_loader, outfile ):
 if __name__ == '__main__':
     params = parse_args('save_features')
 
+    print("Commit after saving features and testing.")
+    
     isAircraft = (params.dataset == 'aircrafts')
 
     assert params.method != 'maml' and params.method != 'maml_approx', 'maml do not support save_feature and run'
@@ -49,10 +51,7 @@ if __name__ == '__main__':
     image_size = params.image_size
     loadfile = os.path.join('filelists', params.dataset, 'novel.json')
 
-    if params.json_seed is not None:
-        checkpoint_dir = '%s/checkpoints/%s_%s/%s_%s_%s' %(configs.save_dir, params.dataset, params.json_seed, params.date, params.model, params.method)
-    else:
-        checkpoint_dir = '%s/checkpoints/%s/%s_%s_%s' %(configs.save_dir, params.dataset, params.date, params.model, params.method)
+    checkpoint_dir = 'ckpts/%s/%s_%s_%s' %(params.dataset, params.date, params.model, params.method)
     if params.train_aug:
         checkpoint_dir += '_aug'
     if not params.method in ['baseline', 'baseline++'] :
@@ -63,6 +62,10 @@ if __name__ == '__main__':
         checkpoint_dir += params.dataset_unlabel
         checkpoint_dir += str(params.bs)
 
+    ## Track bn stats
+    if params.tracking:
+        checkpoint_dir += '_tracking'
+        
     ## Add jigsaw
     if params.jigsaw:
         checkpoint_dir += '_jigsaw_lbda%.2f'%(params.lbda)
@@ -90,9 +93,9 @@ if __name__ == '__main__':
             modelfile   = get_best_file(checkpoint_dir)
 
     if params.save_iter != -1:
-        outfile = os.path.join( checkpoint_dir.replace("checkpoints","features"), split + "_" + str(params.save_iter)+ ".hdf5")
+        outfile = os.path.join( checkpoint_dir.replace("ckpts","features"), params.split + "_" + str(params.save_iter)+ ".hdf5")
     else:
-        outfile = os.path.join( checkpoint_dir.replace("checkpoints","features"), split + ".hdf5")
+        outfile = os.path.join( checkpoint_dir.replace("ckpts","features"), params.split + ".hdf5")
 
     datamgr         = SimpleDataManager(image_size, batch_size = params.test_bs, isAircraft=isAircraft)
     data_loader      = datamgr.get_data_loader(loadfile, aug = False)
@@ -136,10 +139,13 @@ if __name__ == '__main__':
             state[newkey] = state.pop(key)
         else:
             state.pop(key)
-
-    model.feature.load_state_dict(state)
-    model.feature.eval()
-    model.eval()
+    if params.method != 'baseline':
+        model.feature.load_state_dict(state)
+        model.feature.eval()
+        model.eval()
+    else:
+        model.load_state_dict(state)
+        model.eval()
 
     dirname = os.path.dirname(outfile)
     if not os.path.isdir(dirname):

@@ -73,7 +73,7 @@ class BaselineTrain(nn.Module):
             self.classifier_rotation = nn.Sequential()
             self.classifier_rotation.add_module('fc8',nn.Linear(128, 4))
 
-    def forward(self,x):
+    def forward(self,xz):
         x    = Variable(x.cuda())
         out  = self.feature(x)
         scores  = self.classifier(out.view(x.size(0), -1))

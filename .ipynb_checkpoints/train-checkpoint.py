@@ -87,6 +87,11 @@ if __name__=='__main__':
    
     params = parse_args('train')
 
+    if not params.committed:
+        print("Commit the code and then execute with the --committed arg")
+        exit()
+
+
     os.environ["CUDA_VISIBLE_DEVICES"] = params.device
 
 
@@ -210,7 +215,7 @@ if __name__=='__main__':
             model.load_state_dict(tmp['state'])
             del tmp
     elif params.warmup: #We also support warmup from pretrained baseline feature, but we never used in our paper
-        baseline_checkpoint_dir = 'checkpoints/%s/%s_%s' %(params.dataset, params.model, 'baseline')
+        baseline_checkpoint_dir = 'ckpts/%s/%s_%s' %(params.dataset, params.model, 'baseline')
         if params.train_aug:
             baseline_checkpoint_dir += '_aug'
         warmup_resume_file = get_resume_file(baseline_checkpoint_dir)
@@ -236,20 +241,20 @@ if __name__=='__main__':
         print('Load model from:',params.loadfile)
         model.load_state_dict(pretrained_dict, strict=False)
 
-    json.dump(vars(params), open(params.checkpoint_dir+'/configs.json','w'))
+#     json.dump(vars(params), open(params.checkpoint_dir+'/configs.json','w'))
     
     
-    # Init WANDB
+#     # Init WANDB
     
-    if params.resume_wandb_id:
-        print('Resuming from wandb ID: ', params.resume_wandb_id)
-        wandb.init(project="fsl_ssl", id=params.resume_wandb_id, resume=True)
-    else:
-        print('Fresh wandb run')
-        wandb.init(project="fsl_ssl")
+#     if params.resume_wandb_id:
+#         print('Resuming from wandb ID: ', params.resume_wandb_id)
+#         wandb.init(project="fsl_ssl", id=params.resume_wandb_id, resume=True)
+#     else:
+#         print('Fresh wandb run')
+#         wandb.init(project="fsl_ssl")
 
     
-    train(base_loader, val_loader,  model, start_epoch, stop_epoch, params)
+#     train(base_loader, val_loader,  model, start_epoch, stop_epoch, params)
 
 
     ##### from save_features.py (except maml)#####
@@ -298,9 +303,9 @@ if __name__=='__main__':
         acc_mean, acc_std = model.test_loop( novel_loader, return_std = True)
     else:
         if params.save_iter != -1:
-            outfile = os.path.join( checkpoint_dir.replace("checkpoints","features"), "novel_" + str(params.save_iter)+ ".hdf5")
+            outfile = os.path.join( checkpoint_dir.replace("ckpts","features"), "novel_" + str(params.save_iter)+ ".hdf5")
         else:
-            outfile = os.path.join( checkpoint_dir.replace("checkpoints","features"), "novel.hdf5")
+            outfile = os.path.join( checkpoint_dir.replace("ckpts","features"), "novel.hdf5")
 
         datamgr          = SimpleDataManager(image_size, batch_size = params.test_bs, isAircraft=isAircraft)
         loadfile         = os.path.join('filelists', params.dataset, 'novel.json')
@@ -330,7 +335,7 @@ if __name__=='__main__':
 
         ### from test.py ###
         from test import feature_evaluation
-        novel_file = os.path.join( checkpoint_dir.replace("checkpoints","features"), split_str +".hdf5") #defaut split = novel, but you can also test base or val classes
+        novel_file = os.path.join( checkpoint_dir.replace("ckpts","features"), split_str +".hdf5") #defaut split = novel, but you can also test base or val classes
         print('load novel file from:',novel_file)
         import data.feature_loader as feat_loader
         cl_data_file = feat_loader.init_loader(novel_file)
@@ -344,7 +349,7 @@ if __name__=='__main__':
         acc_std  = np.std(acc_all)
         print('%d Test Acc = %4.2f%% +- %4.2f%%' %(iter_num, acc_mean, 1.96* acc_std/np.sqrt(iter_num)))
         
-        with open(os.path.join( checkpoint_dir.replace("checkpoints","features"), split_str +"_test.txt") , 'a') as f:
+        with open(os.path.join( checkpoint_dir.replace("ckpts","features"), split_str +"_test.txt") , 'a') as f:
             timestamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
             aug_str = '-aug' if params.train_aug else ''
             aug_str += '-adapted' if params.adaptation else ''
