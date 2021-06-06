@@ -87,6 +87,11 @@ if __name__=='__main__':
    
     params = parse_args('train')
 
+    if not params.committed:
+        print("Commit the code and then execute with the --committed arg")
+        exit()
+
+
     os.environ["CUDA_VISIBLE_DEVICES"] = params.device
 
 
