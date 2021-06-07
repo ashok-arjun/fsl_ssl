@@ -256,6 +256,8 @@ if __name__=='__main__':
         wandb.init(project="fsl_ssl")
 
     
+    print("About to start training. Last model and best model will be saved in wandb at every model save. \n Run save_features.py and test.py after the training completes, with the same arguments")
+    
     train(base_loader, val_loader,  model, start_epoch, stop_epoch, params)
 
 
