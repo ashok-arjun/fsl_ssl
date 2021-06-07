@@ -250,10 +250,10 @@ if __name__=='__main__':
     
     if params.resume_wandb_id:
         print('Resuming from wandb ID: ', params.resume_wandb_id)
-        wandb.init(project="fsl_ssl", id=params.resume_wandb_id, resume=True)
+        wandb.init(config=vars(params), project="fsl_ssl", id=params.resume_wandb_id, resume=True)
     else:
         print('Fresh wandb run')
-        wandb.init(project="fsl_ssl")
+        wandb.init(config=vars(params), project="fsl_ssl")
 
     
     print("About to start training. Last model and best model will be saved in wandb at every model save. \n Run save_features.py and test.py after the training completes, with the same arguments")
