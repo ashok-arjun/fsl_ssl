@@ -243,123 +243,123 @@ if __name__=='__main__':
         print('Load model from:',params.loadfile)
         model.load_state_dict(pretrained_dict, strict=False)
 
-#     json.dump(vars(params), open(params.checkpoint_dir+'/configs.json','w'))
+    json.dump(vars(params), open(params.checkpoint_dir+'/configs.json','w'))
     
     
-#     # Init WANDB
+    # Init WANDB
     
-#     if params.resume_wandb_id:
-#         print('Resuming from wandb ID: ', params.resume_wandb_id)
-#         wandb.init(project="fsl_ssl", id=params.resume_wandb_id, resume=True)
+    if params.resume_wandb_id:
+        print('Resuming from wandb ID: ', params.resume_wandb_id)
+        wandb.init(project="fsl_ssl", id=params.resume_wandb_id, resume=True)
+    else:
+        print('Fresh wandb run')
+        wandb.init(project="fsl_ssl")
+
+    
+    train(base_loader, val_loader,  model, start_epoch, stop_epoch, params)
+
+
+#     ##### from save_features.py (except maml)#####
+#     split = 'novel'
+#     if params.save_iter != -1:
+#         split_str = split + "_" +str(params.save_iter)
 #     else:
-#         print('Fresh wandb run')
-#         wandb.init(project="fsl_ssl")
+#         split_str = split
 
-    
-#     train(base_loader, val_loader,  model, start_epoch, stop_epoch, params)
+#     iter_num = 600
+#     few_shot_params = dict(n_way = params.test_n_way , n_support = params.n_shot)
+#     acc_all = []
 
+#     if params.loadfile != '':
+#         modelfile   = params.loadfile
+#         checkpoint_dir = params.loadfile
+#     else:
+#         checkpoint_dir = params.checkpoint_dir
+#         if params.save_iter != -1:
+#             modelfile   = get_assigned_file(checkpoint_dir,params.save_iter)
+#         elif params.method in ['baseline', 'baseline++'] :
+#             modelfile   = get_resume_file(checkpoint_dir)
+#         else:
+#             modelfile   = get_best_file(checkpoint_dir)
 
-    ##### from save_features.py (except maml)#####
-    split = 'novel'
-    if params.save_iter != -1:
-        split_str = split + "_" +str(params.save_iter)
-    else:
-        split_str = split
+#     if params.method in ['maml', 'maml_approx']:
+#         if modelfile is not None:
+#             tmp = torch.load(modelfile)
+#             state = tmp['state']
+#             state_keys = list(state.keys())
+#             for i, key in enumerate(state_keys):
+#                 if "feature." in key:
+#                     newkey = key.replace("feature.","")  # an architecture model has attribute 'feature', load architecture feature to backbone by casting name from 'feature.trunk.xx' to 'trunk.xx'
+#                     state[newkey] = state.pop(key)
+#                 else:
+#                     state.pop(key)
+#             model.feature.load_state_dict(tmp['state'])
+#         print('modelfile:',modelfile)
 
-    iter_num = 600
-    few_shot_params = dict(n_way = params.test_n_way , n_support = params.n_shot)
-    acc_all = []
+#         datamgr          = SetDataManager(image_size, n_eposide = iter_num, n_query = 15 , **few_shot_params, isAircraft=isAircraft)
+#         loadfile         = os.path.join('filelists', params.dataset, 'novel.json')
+#         novel_loader     = datamgr.get_data_loader( loadfile, aug = False)
+#         if params.adaptation:
+#             model.task_update_num = 100 #We perform adaptation on MAML simply by updating more times.
+#         model.eval()
+#         acc_mean, acc_std = model.test_loop( novel_loader, return_std = True)
+#     else:
+#         if params.save_iter != -1:
+#             outfile = os.path.join( checkpoint_dir.replace("ckpts","features"), "novel_" + str(params.save_iter)+ ".hdf5")
+#         else:
+#             outfile = os.path.join( checkpoint_dir.replace("ckpts","features"), "novel.hdf5")
 
-    if params.loadfile != '':
-        modelfile   = params.loadfile
-        checkpoint_dir = params.loadfile
-    else:
-        checkpoint_dir = params.checkpoint_dir
-        if params.save_iter != -1:
-            modelfile   = get_assigned_file(checkpoint_dir,params.save_iter)
-        elif params.method in ['baseline', 'baseline++'] :
-            modelfile   = get_resume_file(checkpoint_dir)
-        else:
-            modelfile   = get_best_file(checkpoint_dir)
+#         datamgr          = SimpleDataManager(image_size, batch_size = params.test_bs, isAircraft=isAircraft)
+#         loadfile         = os.path.join('filelists', params.dataset, 'novel.json')
+#         data_loader      = datamgr.get_data_loader(loadfile, aug = False)
 
-    if params.method in ['maml', 'maml_approx']:
-        if modelfile is not None:
-            tmp = torch.load(modelfile)
-            state = tmp['state']
-            state_keys = list(state.keys())
-            for i, key in enumerate(state_keys):
-                if "feature." in key:
-                    newkey = key.replace("feature.","")  # an architecture model has attribute 'feature', load architecture feature to backbone by casting name from 'feature.trunk.xx' to 'trunk.xx'
-                    state[newkey] = state.pop(key)
-                else:
-                    state.pop(key)
-            model.feature.load_state_dict(tmp['state'])
-        print('modelfile:',modelfile)
+#         tmp = torch.load(modelfile)
+#         state = tmp['state']
+#         state_keys = list(state.keys())
+#         for i, key in enumerate(state_keys):
+#             if "feature." in key:
+#                 newkey = key.replace("feature.","")  # an architecture model has attribute 'feature', load architecture feature to backbone by casting name from 'feature.trunk.xx' to 'trunk.xx'
+#                 state[newkey] = state.pop(key)
+#             else:
+#                 state.pop(key)
 
-        datamgr          = SetDataManager(image_size, n_eposide = iter_num, n_query = 15 , **few_shot_params, isAircraft=isAircraft)
-        loadfile         = os.path.join('filelists', params.dataset, 'novel.json')
-        novel_loader     = datamgr.get_data_loader( loadfile, aug = False)
-        if params.adaptation:
-            model.task_update_num = 100 #We perform adaptation on MAML simply by updating more times.
-        model.eval()
-        acc_mean, acc_std = model.test_loop( novel_loader, return_std = True)
-    else:
-        if params.save_iter != -1:
-            outfile = os.path.join( checkpoint_dir.replace("ckpts","features"), "novel_" + str(params.save_iter)+ ".hdf5")
-        else:
-            outfile = os.path.join( checkpoint_dir.replace("ckpts","features"), "novel.hdf5")
+#         model.feature.load_state_dict(state)
+#         model.eval()
+#         model = model.cuda()
+#         model.eval()
 
-        datamgr          = SimpleDataManager(image_size, batch_size = params.test_bs, isAircraft=isAircraft)
-        loadfile         = os.path.join('filelists', params.dataset, 'novel.json')
-        data_loader      = datamgr.get_data_loader(loadfile, aug = False)
+#         dirname = os.path.dirname(outfile)
+#         if not os.path.isdir(dirname):
+#             os.makedirs(dirname)
+#         print('save outfile at:', outfile)
+#         from save_features import save_features
+#         save_features(model, data_loader, outfile)
 
-        tmp = torch.load(modelfile)
-        state = tmp['state']
-        state_keys = list(state.keys())
-        for i, key in enumerate(state_keys):
-            if "feature." in key:
-                newkey = key.replace("feature.","")  # an architecture model has attribute 'feature', load architecture feature to backbone by casting name from 'feature.trunk.xx' to 'trunk.xx'
-                state[newkey] = state.pop(key)
-            else:
-                state.pop(key)
+#         ### from test.py ###
+#         from test import feature_evaluation
+#         novel_file = os.path.join( checkpoint_dir.replace("ckpts","features"), split_str +".hdf5") #defaut split = novel, but you can also test base or val classes
+#         print('load novel file from:',novel_file)
+#         import data.feature_loader as feat_loader
+#         cl_data_file = feat_loader.init_loader(novel_file)
 
-        model.feature.load_state_dict(state)
-        model.eval()
-        model = model.cuda()
-        model.eval()
+#         for i in range(iter_num):
+#             acc = feature_evaluation(cl_data_file, model, n_query = 15, adaptation = params.adaptation, **few_shot_params)
+#             acc_all.append(acc)
 
-        dirname = os.path.dirname(outfile)
-        if not os.path.isdir(dirname):
-            os.makedirs(dirname)
-        print('save outfile at:', outfile)
-        from save_features import save_features
-        save_features(model, data_loader, outfile)
-
-        ### from test.py ###
-        from test import feature_evaluation
-        novel_file = os.path.join( checkpoint_dir.replace("ckpts","features"), split_str +".hdf5") #defaut split = novel, but you can also test base or val classes
-        print('load novel file from:',novel_file)
-        import data.feature_loader as feat_loader
-        cl_data_file = feat_loader.init_loader(novel_file)
-
-        for i in range(iter_num):
-            acc = feature_evaluation(cl_data_file, model, n_query = 15, adaptation = params.adaptation, **few_shot_params)
-            acc_all.append(acc)
-
-        acc_all  = np.asarray(acc_all)
-        acc_mean = np.mean(acc_all)
-        acc_std  = np.std(acc_all)
-        print('%d Test Acc = %4.2f%% +- %4.2f%%' %(iter_num, acc_mean, 1.96* acc_std/np.sqrt(iter_num)))
+#         acc_all  = np.asarray(acc_all)
+#         acc_mean = np.mean(acc_all)
+#         acc_std  = np.std(acc_all)
+#         print('%d Test Acc = %4.2f%% +- %4.2f%%' %(iter_num, acc_mean, 1.96* acc_std/np.sqrt(iter_num)))
         
-        with open(os.path.join( checkpoint_dir.replace("ckpts","features"), split_str +"_test.txt") , 'a') as f:
-            timestamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
-            aug_str = '-aug' if params.train_aug else ''
-            aug_str += '-adapted' if params.adaptation else ''
-            if params.method in ['baseline', 'baseline++'] :
-                exp_setting = '%s-%s-%s-%s%s %sshot %sway_test' %(params.dataset, split_str, params.model, params.method, aug_str, params.n_shot, params.test_n_way )
-            else:
-                exp_setting = '%s-%s-%s-%s%s %sshot %sway_train %sway_test' %(params.dataset, split_str, params.model, params.method, aug_str , params.n_shot , params.train_n_way, params.test_n_way )
-            acc_str = '%d Test Acc = %4.2f%% +- %4.2f%%' %(iter_num, acc_mean, 1.96* acc_std/np.sqrt(iter_num))
-            f.write( 'Time: %s, Setting: %s, Acc: %s \n' %(timestamp,exp_setting,acc_str)  )
+#         with open(os.path.join( checkpoint_dir.replace("ckpts","features"), split_str +"_test.txt") , 'a') as f:
+#             timestamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+#             aug_str = '-aug' if params.train_aug else ''
+#             aug_str += '-adapted' if params.adaptation else ''
+#             if params.method in ['baseline', 'baseline++'] :
+#                 exp_setting = '%s-%s-%s-%s%s %sshot %sway_test' %(params.dataset, split_str, params.model, params.method, aug_str, params.n_shot, params.test_n_way )
+#             else:
+#                 exp_setting = '%s-%s-%s-%s%s %sshot %sway_train %sway_test' %(params.dataset, split_str, params.model, params.method, aug_str , params.n_shot , params.train_n_way, params.test_n_way )
+#             acc_str = '%d Test Acc = %4.2f%% +- %4.2f%%' %(iter_num, acc_mean, 1.96* acc_std/np.sqrt(iter_num))
+#             f.write( 'Time: %s, Setting: %s, Acc: %s \n' %(timestamp,exp_setting,acc_str)  )
 
 
