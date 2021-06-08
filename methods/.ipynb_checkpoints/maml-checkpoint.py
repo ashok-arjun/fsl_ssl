@@ -223,8 +223,7 @@ class MAML(MetaTemplate):
 
             if task_count == self.n_task:
                 loss_q = torch.stack(loss_all).sum(0)
-                wandb.log({'train/loss': float(loss_q.data.item())}, step=self.global_count)
-                writer.add_scalar('train/loss', float(loss_q.data.item()), self.global_count//self.n_task)
+                wandb.log({'train/loss': float(loss_q.data.item()), 'task_index': self.global_count//self.n_task}, step=self.global_count)
                 loss_q.backward()
 
                 optimizer.step()
@@ -243,6 +242,41 @@ class MAML(MetaTemplate):
                     print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i+1, len(train_loader), avg_loss/float(i+1)))
                       
     def test_loop(self, test_loader, return_std = False): #overwrite parrent function
+        correct =0
+        count = 0
+        acc_all = []
+        acc_all_jigsaw = []
+        acc_all_rotation = []
+        
+        iter_num = len(test_loader) 
+        for i, inputs in enumerate(test_loader):
+            x = inputs[0]
+            self.n_query = x.size(1) - self.n_support
+            assert self.n_way  ==  x.size(0), "MAML do not support way change"
+            correct_this, count_this = self.correct(x)
+            acc_all.append(correct_this/ count_this *100)
+
+            if self.jigsaw:
+                loss_jigsaw, acc_jigsaw = self.set_forward_loss_unlabel(inputs[2], inputs[3])
+                acc_all_jigsaw.append(acc_jigsaw*100)
+
+        acc_all  = np.asarray(acc_all)
+        acc_mean = np.mean(acc_all)
+        acc_std  = np.std(acc_all)
+        print('%d Test Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean, 1.96* acc_std/np.sqrt(iter_num)))
+        if self.jigsaw:
+            acc_all_jigsaw  = np.asarray(acc_all_jigsaw)
+            acc_mean_jigsaw = np.mean(acc_all_jigsaw)
+            acc_std_jigsaw  = np.std(acc_all_jigsaw)
+            print('%d Test Jigsaw Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean_jigsaw, 1.96* acc_std_jigsaw/np.sqrt(iter_num)))
+            return acc_mean, acc_mean_jigsaw
+
+        if return_std:
+            return acc_mean, acc_std
+        else:
+            return acc_mean
+        
+    def test_loop_with_loss(self, test_loader, return_std = False): #overwrite parrent function
         correct =0
         count = 0
         acc_all = []

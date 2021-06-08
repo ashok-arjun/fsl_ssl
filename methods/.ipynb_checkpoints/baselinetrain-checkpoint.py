@@ -231,6 +231,7 @@ class BaselineTrain(nn.Module):
                     avg_loss_jigsaw += loss_jigsaw
                     avg_acc_jigsaw = avg_acc_jigsaw+acc_jigsaw
                     wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
+                    wandb.log({'train/acc_proto': acc}, step=self.global_count)
                     
                 elif self.rotation:
                     loss_proto, loss_rotation, acc, acc_rotation = self.forward_loss(x, y, inputs[2], inputs[3])
@@ -243,15 +244,15 @@ class BaselineTrain(nn.Module):
                     avg_loss_rotation += loss_rotation
                     avg_acc_rotation = avg_acc_rotation+acc_rotation
                     wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
+                    wandb.log({'train/acc_proto': acc}, step=self.global_count)
                 else:
                     loss, acc = self.forward_loss(x,y)
-                    wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
+                    wandb.log({'train/loss_proto': float(loss.data.item())}, step=self.global_count)
+                    wandb.log({'train/acc_proto': acc}, step=self.global_count)
                 
                 avg_loss = avg_loss+loss.data
-                avg_acc_proto = avg_acc_proto+acc
-                
+                avg_acc_proto = avg_acc_proto+acc                
                 wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
-                wandb.log({'train/acc_proto': acc}, step=self.global_count)
                 loss.backward()
                 optimizer.step()
 
@@ -343,6 +344,8 @@ class BaselineTrain(nn.Module):
                     avg_loss_rotation += loss_rotation
                 else:
                     loss, acc = self.forward_loss(x,y)
+                    loss_proto = loss
+                    
                 num_correct += int(acc*x.shape[0])
                 num_total += len(y)
                 
