@@ -73,7 +73,7 @@ class BaselineTrain(nn.Module):
             self.classifier_rotation = nn.Sequential()
             self.classifier_rotation.add_module('fc8',nn.Linear(128, 4))
 
-    def forward(self,xz):
+    def forward(self,x):
         x    = Variable(x.cuda())
         out  = self.feature(x)
         scores  = self.classifier(out.view(x.size(0), -1))
@@ -284,6 +284,7 @@ class BaselineTrain(nn.Module):
             num_total = 0
             num_correct_jigsaw = 0
             num_total_jigsaw = 0
+
             for i, inputs in enumerate(val_loader):
                 x = inputs[0]
                 y = inputs[1]
@@ -316,3 +317,60 @@ class BaselineTrain(nn.Module):
             else:
                 return -1 #no validation, just save model during iteration
 
+
+    def test_loop_with_loss(self, val_loader=None):
+        if val_loader is not None:
+            num_correct = 0
+            num_total = 0
+            num_correct_jigsaw = 0
+            num_total_jigsaw = 0
+            num_correct_rotation= 0
+            num_total_rotation = 0
+            
+            avg_loss=0
+            avg_loss_proto=0
+            avg_loss_jigsaw=0
+            avg_loss_rotation=0
+            
+            for i, inputs in enumerate(val_loader):
+                x = inputs[0]
+                y = inputs[1]
+                if self.jigsaw:
+                    loss_proto, loss_jigsaw, acc, acc_jigsaw = self.forward_loss(x, y, inputs[2], inputs[3])
+                    loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_jigsaw
+                    num_correct_jigsaw = int(acc_jigsaw*len(inputs[3]))
+                    num_total_jigsaw += len(inputs[3].view(-1))
+                    avg_loss_jigsaw += loss_jigsaw
+                elif self.rotation:
+                    loss_proto, loss_rotation, acc, acc_rotation = self.forward_loss(x, y, inputs[2], inputs[3])
+                    loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_rotation
+                    num_correct_rotation = int(acc_rotation*len(inputs[3]))
+                    num_total_rotation += len(inputs[3].view(-1))
+                    avg_loss_rotation += loss_rotation
+                else:
+                    loss, acc = self.forward_loss(x,y)
+                num_correct += int(acc*x.shape[0])
+                num_total += len(y)
+                
+                avg_loss += loss
+                avg_loss_proto += loss_proto
+                
+            avg_loss /= len(val_loader)
+            avg_loss_proto /= len(val_loader)
+            avg_loss_rotation /= len(val_loader)
+            avg_loss_jigsaw /= len(val_loader)
+            
+            if self.jigsaw:
+                return (num_correct*100.0/num_total, num_correct_jigsaw*100.0/num_total_jigsaw), (avg_loss, avg_loss_proto, avg_loss_jigsaw)
+            elif self.rotation:
+                return (num_correct*100.0/num_total, num_correct_rotation*100.0/num_total_rotation), (avg_loss, avg_loss_proto, avg_loss_rotation)
+            else:
+                return (num_correct*100.0/num_total), (avg_loss, avg_loss_proto)
+
+        else:
+            if self.jigsaw:
+                return -1, -1
+            elif self.rotation:
+                return -1, -1
+            else:
+                return -1 #no validation, just save model during iteration

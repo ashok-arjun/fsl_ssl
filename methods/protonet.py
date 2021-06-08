@@ -142,7 +142,9 @@ class ProtoNet(MetaTemplate):
                     avg_loss_rotation += loss_rotation.data
                     wandb.log({'train/acc_proto': acc}, step=self.global_count)
                     wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
-
+                else:
+                    wandb.log({'train/acc': acc}, step=self.global_count)
+                    
                 if (i+1) % print_freq==0:
                     #print(optimizer.state_dict()['param_groups'][0]['lr'])
                     if self.jigsaw:
@@ -154,6 +156,74 @@ class ProtoNet(MetaTemplate):
                     else:
                         print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i+1, len(train_loader), avg_loss/float(i+1)))
 
+                        
+    def test_loop_with_loss(self, test_loader, record = None):
+        correct =0
+        count = 0
+        acc_all = []
+        acc_all_jigsaw = []
+        acc_all_rotation = []
+
+        avg_loss=0
+        avg_loss_proto=0
+        avg_loss_jigsaw=0
+        avg_loss_rotation=0
+        
+        iter_num = len(test_loader)
+        for i, inputs in enumerate(test_loader):
+            x = inputs[0]
+            self.n_query = x.size(1) - self.n_support
+            if self.change_way:
+                self.n_way  = x.size(0)
+
+            if self.jigsaw:
+                correct_this, correct_this_jigsaw, count_this, count_this_jigsaw, loss_proto, loss_jigsaw = self.correct_with_loss(x, inputs[2], inputs[3])
+                loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_jigsaw
+                avg_loss_proto += loss_proto.data
+                avg_loss_jigsaw += loss_jigsaw.data
+            elif self.rotation:
+                correct_this, correct_this_rotation, count_this, count_this_rotation, loss_proto, loss_rotation = self.correct_with_loss(x, inputs[2], inputs[3])
+                loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_rotation
+                avg_loss_proto += loss_proto.data
+                avg_loss_rotation += loss_rotation.data
+            else:
+                correct_this, count_this, loss_proto = self.correct_with_loss(x)
+                avg_loss_proto += loss_proto.data
+                loss = loss_proto
+                
+            avg_loss = avg_loss+loss.data
+            
+            acc_all.append(correct_this/ count_this*100)
+            if self.jigsaw:
+                acc_all_jigsaw.append(correct_this_jigsaw/ count_this_jigsaw*100)
+            elif self.rotation:
+                acc_all_rotation.append(correct_this_rotation/ count_this_rotation*100)
+
+        acc_all  = np.asarray(acc_all)
+        acc_mean = np.mean(acc_all)
+        acc_std  = np.std(acc_all)
+        
+        avg_loss = avg_loss / iter_num
+        avg_loss_proto = avg_loss_proto / item_num
+        avg_loss_jigsaw = avg_loss_jigsaw / iter_num
+        avg_loss_rotation = avg_loss_rotation / iter_num
+        
+        print('%d Test Protonet Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean, 1.96* acc_std/np.sqrt(iter_num)))
+        if self.jigsaw:
+            acc_all_jigsaw  = np.asarray(acc_all_jigsaw)
+            acc_mean_jigsaw = np.mean(acc_all_jigsaw)
+            acc_std_jigsaw  = np.std(acc_all_jigsaw)
+            print('%d Test Jigsaw Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean_jigsaw, 1.96* acc_std_jigsaw/np.sqrt(iter_num)))
+            return (acc_mean, acc_mean_jigsaw), (avg_loss, avg_loss_proto, avg_loss_jigsaw)
+        elif self.rotation:
+            acc_all_rotation  = np.asarray(acc_all_rotation)
+            acc_mean_rotation = np.mean(acc_all_rotation)
+            acc_std_rotation  = np.std(acc_all_rotation)
+            print('%d Test Rotation Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean_rotation, 1.96* acc_std_rotation/np.sqrt(iter_num)))
+            return (acc_mean, acc_mean_rotation), (avg_loss, avg_loss_proto, avg_loss_rotation)
+        else:
+            return (acc_mean), (avg_loss, avg_loss_proto)
+                        
     def test_loop(self, test_loader, record = None):
         correct =0
         count = 0
@@ -221,6 +291,35 @@ class ProtoNet(MetaTemplate):
             return float(top1_correct), float(top1_correct_rotation), len(y_query), len(y_)
         else:
             return float(top1_correct), len(y_query)
+        
+    def correct_with_loss(self, x, patches=None, patches_label=None):
+        scores = self.set_forward(x)
+        if self.jigsaw:
+            x_, y_ = self.set_forward_unlabel(patches=patches,patches_label=patches_label)
+            jigsaw_loss = self.loss_fn(x_,y_)
+        elif self.rotation:
+            x_, y_ = self.set_forward_unlabel(patches=patches,patches_label=patches_label)
+            rotation_loss = self.loss_fn(x_,y_)
+            
+        y_query = np.repeat(range( self.n_way ), self.n_query )
+
+        topk_scores, topk_labels = scores.data.topk(1, 1, True, True)
+        topk_ind = topk_labels.cpu().numpy()
+        top1_correct = np.sum(topk_ind[:,0] == y_query)
+
+        y_query_ = Variable(y_query.cuda())
+        loss = self.loss_fn(scores, y_query_)
+        
+        if self.jigsaw:
+            pred = torch.max(x_,1)
+            top1_correct_jigsaw = torch.sum(pred[1] == y_)
+            return float(top1_correct), float(top1_correct_jigsaw), len(y_query), len(y_), loss, jigsaw_loss
+        elif self.rotation:
+            pred = torch.max(x_,1)
+            top1_correct_rotation = torch.sum(pred[1] == y_)
+            return float(top1_correct), float(top1_correct_rotation), len(y_query), len(y_), loss, rotation_loss
+        else:
+            return float(top1_correct), len(y_query), loss
 
     def set_forward(self,x,is_feature = False):
         z_support, z_query  = self.parse_feature(x,is_feature)
