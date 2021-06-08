@@ -204,7 +204,7 @@ class ProtoNet(MetaTemplate):
         acc_std  = np.std(acc_all)
         
         avg_loss = avg_loss / iter_num
-        avg_loss_proto = avg_loss_proto / item_num
+        avg_loss_proto = avg_loss_proto / iter_num
         avg_loss_jigsaw = avg_loss_jigsaw / iter_num
         avg_loss_rotation = avg_loss_rotation / iter_num
         
