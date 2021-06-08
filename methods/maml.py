@@ -270,7 +270,7 @@ class MAML(MetaTemplate):
             acc_std_jigsaw  = np.std(acc_all_jigsaw)
             print('%d Test Jigsaw Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean_jigsaw, 1.96* acc_std_jigsaw/np.sqrt(iter_num)))
             return acc_mean, acc_mean_jigsaw
-
+        
         if return_std:
             return acc_mean, acc_std
         else:
@@ -294,12 +294,24 @@ class MAML(MetaTemplate):
             if self.jigsaw:
                 loss_jigsaw, acc_jigsaw = self.set_forward_loss_unlabel(inputs[2], inputs[3])
                 acc_all_jigsaw.append(acc_jigsaw*100)
+            
+            if self.rotation:
+                loss_rotation, acc_rotation = self.set_forward_loss_unlabel(inputs[2], inputs[3])
+                acc_all_rotation.append(acc_rotation*100)
 
         acc_all  = np.asarray(acc_all)
         acc_mean = np.mean(acc_all)
         acc_std  = np.std(acc_all)
         print('%d Test Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean, 1.96* acc_std/np.sqrt(iter_num)))
-        if self.jigsaw:
+        
+        if self.rotation:
+            acc_all_rotation  = np.asarray(acc_all_rotation)
+            acc_mean_rotation = np.mean(acc_all_rotation)
+            acc_std_rotation  = np.std(acc_all_rotation)
+            print('%d Test Rotation Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean_rotation, 1.96* acc_std_rotation/np.sqrt(iter_num)))
+            return acc_mean, acc_mean_rotation
+        
+        elif self.jigsaw:
             acc_all_jigsaw  = np.asarray(acc_all_jigsaw)
             acc_mean_jigsaw = np.mean(acc_all_jigsaw)
             acc_std_jigsaw  = np.std(acc_all_jigsaw)
