@@ -120,30 +120,30 @@ class ProtoNet(MetaTemplate):
                     loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_jigsaw
                     wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
                     wandb.log({'train/loss_jigsaw': float(loss_jigsaw.data.item())}, step=self.global_count)
-                elif self.rotation:
-                    loss_rotation, acc_rotation = self.set_forward_loss_unlabel(inputs[2], inputs[3])# torch.Size([5, 21, 9, 3, 75, 75]), torch.Size([5, 21])
-                    loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_rotation
-                    wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
-                    wandb.log({'train/loss_rotation': float(loss_rotation.data.item())}, step=self.global_count)
-                else:
-                    loss = loss_proto
-                loss.backward()
-                optimizer.step()
-                avg_loss = avg_loss+loss.item()
-                wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
-
-                if self.jigsaw:
+                    
                     avg_loss_proto += loss_proto.data
                     avg_loss_jigsaw += loss_jigsaw.data
                     wandb.log({'train/acc_proto': acc}, step=self.global_count)
                     wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
                 elif self.rotation:
+                    loss_rotation, acc_rotation = self.set_forward_loss_unlabel(inputs[2], inputs[3])# torch.Size([5, 21, 9, 3, 75, 75]), torch.Size([5, 21])
+                    loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_rotation
+                    wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
+                    wandb.log({'train/loss_rotation': float(loss_rotation.data.item())}, step=self.global_count)
+                    
                     avg_loss_proto += loss_proto.data
                     avg_loss_rotation += loss_rotation.data
                     wandb.log({'train/acc_proto': acc}, step=self.global_count)
                     wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
                 else:
-                    wandb.log({'train/acc': acc}, step=self.global_count)
+                    loss = loss_proto
+                    wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
+                    wandb.log({'train/acc_proto': acc}, step=self.global_count)
+                
+                loss.backward()
+                optimizer.step()
+                avg_loss = avg_loss+loss.item()
+                wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
                     
                 if (i+1) % print_freq==0:
                     #print(optimizer.state_dict()['param_groups'][0]['lr'])

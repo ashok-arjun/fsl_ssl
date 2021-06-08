@@ -41,7 +41,7 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
     writer = SummaryWriter(log_dir=params.checkpoint_dir)
     for epoch in range(start_epoch,stop_epoch):
         model.train()
-        model.train_loop(epoch, base_loader, optimizer, writer) #model are called by reference, no need to return 
+        model.train_loop(epoch, base_loader, optimizer, writer) # CHECKED 
         if epoch % eval_interval == True or epoch == stop_epoch - 1: 
             model.eval()
             if not os.path.isdir(params.checkpoint_dir):

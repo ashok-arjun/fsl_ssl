@@ -232,14 +232,6 @@ class MAML(MetaTemplate):
                 loss_all = []
             optimizer.zero_grad()
             
-            if self.jigsaw:
-                wandb.log({'train/acc_proto': acc}, step=self.global_count)
-                wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
-            elif self.rotation:
-                wandb.log({'train/acc_proto': acc}, step=self.global_count)
-                wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
-            else:
-                wandb.log({'train/acc': acc}, step=self.global_count)
             if (i+1) % print_freq==0:
                 if self.jigsaw:
                     print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss MAML {:f} | Loss Jigsaw {:f}'.\
