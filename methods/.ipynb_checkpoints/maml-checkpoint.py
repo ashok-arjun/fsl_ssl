@@ -107,10 +107,17 @@ class MAML(MetaTemplate):
 
     def set_forward_loss(self, x):
         scores = self.set_forward(x, is_feature = False)
-        y_b_i = Variable( torch.from_numpy( np.repeat(range( self.n_way ), self.n_query   ) )).cuda()
-        loss = self.loss_fn(scores, y_b_i)
-
-        return loss
+        
+        y_query = torch.from_numpy(np.repeat(range( self.n_way ), self.n_query ))
+        
+        topk_scores, topk_labels = scores.data.topk(1, 1, True, True)
+        topk_ind = topk_labels.cpu().numpy()
+        acc = np.sum(topk_ind[:,0] == y_query.numpy())/len(y_query.numpy())
+    
+        y_query = Variable(y_query.cuda())
+        loss = self.loss_fn(scores, y_query)
+    
+        return loss, acc
 
     def set_forward_loss_unlabel(self, patches=None, patches_label=None):
         if self.jigsaw:
@@ -184,31 +191,39 @@ class MAML(MetaTemplate):
             self.n_query = x.size(1) - self.n_support
             assert self.n_way  ==  x.size(0), "MAML do not support way change"
 
-            loss_maml = self.set_forward_loss(x)
+            loss_maml, acc = self.set_forward_loss(x)
             if self.jigsaw:
                 loss_jigsaw, acc_jigsaw = self.set_forward_loss_unlabel(inputs[2], inputs[3])# torch.Size([5, 21, 9, 3, 75, 75]), torch.Size([5, 21])
                 loss = (1.0-self.lbda) * loss_maml + self.lbda * loss_jigsaw
-                writer.add_scalar('train/loss_maml', float(loss_maml.data.item()), self.global_count)
-                writer.add_scalar('train/loss_jigsaw', float(loss_jigsaw.data.item()), self.global_count)
+                wandb.log({'train/loss_maml': float(loss_maml.data.item())}, step=self.global_count)
+                wandb.log({'train/loss_jigsaw': float(loss_jigsaw.data.item())}, step=self.global_count)
                 avg_loss_maml += loss_maml.item()
                 avg_loss_jigsaw += loss_jigsaw.item()
+                
+                wandb.log({'train/acc_maml': acc}, step=self.global_count)
+                wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
             elif self.rotation:
                 loss_rotation, acc_rotation = self.set_forward_loss_unlabel(inputs[2], inputs[3])# torch.Size([5, 21, 9, 3, 75, 75]), torch.Size([5, 21])
                 loss = (1.0-self.lbda) * loss_maml + self.lbda * loss_rotation
-                writer.add_scalar('train/loss_maml', float(loss_maml.data.item()), self.global_count)
-                writer.add_scalar('train/loss_rotation', float(loss_rotation.data.item()), self.global_count)
+                wandb.log({'train/loss_maml': float(loss_maml.data.item())}, step=self.global_count)
+                wandb.log({'train/loss_rotation': float(loss_rotation.data.item())}, step=self.global_count)
                 avg_loss_maml += loss_maml.item()
                 avg_loss_rotation += loss_rotation.item()
+                
+                wandb.log({'train/acc_maml': acc}, step=self.global_count)
+                wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
             else:
                 loss = loss_maml
-                writer.add_scalar('train/loss_maml', float(loss_maml.data.item()), self.global_count)
+                wandb.log({'train/loss_maml': float(loss_maml.data.item())}, step=self.global_count)
+                wandb.log({'train/acc_maml': acc}, step=self.global_count)
             avg_loss = avg_loss+loss.item()
             loss_all.append(loss)
-
+            
             task_count += 1
 
             if task_count == self.n_task:
                 loss_q = torch.stack(loss_all).sum(0)
+                wandb.log({'train/loss': float(loss_q.data.item())}, step=self.global_count)
                 writer.add_scalar('train/loss', float(loss_q.data.item()), self.global_count//self.n_task)
                 loss_q.backward()
 
@@ -216,6 +231,15 @@ class MAML(MetaTemplate):
                 task_count = 0
                 loss_all = []
             optimizer.zero_grad()
+            
+            if self.jigsaw:
+                wandb.log({'train/acc_proto': acc}, step=self.global_count)
+                wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
+            elif self.rotation:
+                wandb.log({'train/acc_proto': acc}, step=self.global_count)
+                wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
+            else:
+                wandb.log({'train/acc': acc}, step=self.global_count)
             if (i+1) % print_freq==0:
                 if self.jigsaw:
                     print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss MAML {:f} | Loss Jigsaw {:f}'.\
