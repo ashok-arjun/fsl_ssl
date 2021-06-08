@@ -5,13 +5,14 @@ import os
 import shutil
 import wandb
 import argparse
-
+import torch
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--id', type=str)
 parser.add_argument('--path', type=str)
 
 args = parser.parse_args()
+
 
 wandb.init(id=args.id, project="fsl_ssl", resume=True)
 
@@ -22,4 +23,8 @@ if not os.path.exists(os.path.split(args.path)[0]):
 
 shutil.move(wandb_path.name, args.path)
 
-print("Checkpoint restored in the given path")
+print("Checkpoint restored at ", args.path)
+
+print("The model's epoch is ", torch.load(args.path)["epoch"])
+
+print("Please rename it to continue training")
