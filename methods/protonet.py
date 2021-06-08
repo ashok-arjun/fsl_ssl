@@ -307,7 +307,7 @@ class ProtoNet(MetaTemplate):
         topk_ind = topk_labels.cpu().numpy()
         top1_correct = np.sum(topk_ind[:,0] == y_query)
 
-        y_query_ = Variable(y_query.cuda())
+        y_query_ = Variable(torch.from_numpy(y_query).cuda())
         loss = self.loss_fn(scores, y_query_)
         
         if self.jigsaw:
