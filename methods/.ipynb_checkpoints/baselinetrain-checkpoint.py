@@ -144,134 +144,134 @@ class BaselineTrain(nn.Module):
         avg_loss_softmax=0
         avg_loss_jigsaw=0
         avg_loss_rotation=0
-        avg_acc_proto=0
+        avg_acc_softmax=0
         avg_acc_jigsaw=0
         avg_acc_rotation=0
 
-        if base_loader_u is not None:
-            for i,inputs in enumerate(zip(train_loader,base_loader_u)):
-                self.global_count += 1
-                x = inputs[0][0]
-                y = inputs[0][1]
-                optimizer.zero_grad()
-                loss_softmax, acc = self.forward_loss(x, y, label_only=True)
+#         if base_loader_u is not None:
+#             for i,inputs in enumerate(zip(train_loader,base_loader_u)):
+#                 self.global_count += 1
+#                 x = inputs[0][0]
+#                 y = inputs[0][1]
+#                 optimizer.zero_grad()
+#                 loss_softmax, acc = self.forward_loss(x, y, label_only=True)
 
+#                 if self.jigsaw:
+#                     loss_jigsaw, acc_jigsaw = self.forward_loss(patches=inputs[1][2], patches_label=inputs[1][3], unlabel_only=True)
+#                     loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_jigsaw
+#                     writer.add_scalar('train/loss_softmax', float(loss_softmax.data.item()), self.global_count)
+#                     writer.add_scalar('train/loss_jigsaw', float(loss_jigsaw), self.global_count)
+#                     wandb.log({'train/loss_softmax': float(loss_softmax.data.item())}, step=self.global_count)
+#                     wandb.log({'train/loss_jigsaw': float(loss_jigsaw.data.item())}, step=self.global_count)
+#                 elif self.rotation:
+#                     loss_rotation, acc_rotation = self.forward_loss(patches=inputs[1][2], patches_label=inputs[1][3], unlabel_only=True)
+#                     loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_rotation
+#                     writer.add_scalar('train/loss_softmax', float(loss_softmax.data.item()), self.global_count)
+#                     writer.add_scalar('train/loss_rotation', float(loss_rotation), self.global_count)
+#                     wandb.log({'train/loss_softmax': float(loss_softmax.data.item())}, step=self.global_count)
+#                     wandb.log({'train/loss_rotation': float(loss_rotation.data.item())}, step=self.global_count)
+#                 else:
+#                     loss, acc = self.forward_loss(x,y)
+#                 writer.add_scalar('train/loss', float(loss.data.item()), self.global_count)
+#                 wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
+#                 loss.backward()
+#                 optimizer.step()
+
+#                 if scheduler is not None:
+#                     scheduler.step()
+#                     writer.add_scalar('train/lr', optimizer.param_groups[0]['lr'], self.global_count)
+#                     wandb.log({'train/lr': optimizer.param_groups[0]['lr']}, step=self.global_count)
+
+#                 avg_loss = avg_loss+loss.data#[0]
+#                 avg_acc_softmax = avg_acc_softmax+acc
+
+#                 writer.add_scalar('train/acc_cls', acc, self.global_count)
+#                 wandb.log({'train/acc_cls': acc}, step=self.global_count)
+
+#                 if self.jigsaw:
+#                     avg_loss_softmax += loss_softmax.data
+#                     avg_loss_jigsaw += loss_jigsaw
+#                     avg_acc_jigsaw = avg_acc_jigsaw+acc_jigsaw
+#                     writer.add_scalar('train/acc_jigsaw', acc_jigsaw, self.global_count)
+#                     wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
+#                 elif self.rotation:
+#                     avg_loss_softmax += loss_softmax.data
+#                     avg_loss_rotation += loss_rotation
+#                     avg_acc_rotation = avg_acc_rotation+acc_rotation
+#                     writer.add_scalar('train/acc_rotation', acc_rotation, self.global_count)
+#                     wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
+
+
+#                 if (i+1) % print_freq==0:
+#                     if self.jigsaw:
+#                         print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Cls {:f} | Loss Jigsaw {:f} | Acc Cls {:f} | Acc Jigsaw {:f}'.\
+#                             format(epoch+1, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_softmax/float(i+1), \
+#                                     avg_loss_jigsaw/float(i+1), avg_acc_softmax/float(i+1), avg_acc_jigsaw/float(i+1)))
+#                     elif self.rotation:
+#                         print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Cls {:f} | Loss Rotation {:f} | Acc Cls {:f} | Acc Rotation {:f}'.\
+#                             format(epoch+1, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_softmax/float(i+1), \
+#                                     avg_loss_rotation/float(i+1), avg_acc_softmax/float(i+1), avg_acc_rotation/float(i+1)))
+#                     else:
+#                         print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Acc Cls {:f}'.format(epoch+1, i+1, \
+#                                         len(train_loader), avg_loss/float(i+1), avg_acc_softmax/float(i+1)  ))
+
+#         else:
+        for i, inputs in enumerate(train_loader):
+            self.global_count += 1
+            x = inputs[0]
+            y = inputs[1]
+            optimizer.zero_grad()
+            if self.jigsaw:
+                loss_softmax, loss_jigsaw, acc, acc_jigsaw = self.forward_loss(x, y, inputs[2], inputs[3])
+                loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_jigsaw
+                wandb.log({'train/loss_softmax': float(loss_softmax.data.item())}, step=self.global_count)
+                wandb.log({'train/loss_jigsaw': float(loss_jigsaw.data.item())}, step=self.global_count)
+
+                avg_loss_softmax += loss_softmax.data
+                avg_loss_jigsaw += loss_jigsaw
+                avg_acc_jigsaw = avg_acc_jigsaw+acc_jigsaw
+                wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
+                wandb.log({'train/acc_softmax': acc}, step=self.global_count)
+
+            elif self.rotation:
+                loss_softmax, loss_rotation, acc, acc_rotation = self.forward_loss(x, y, inputs[2], inputs[3])
+                loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_rotation
+                wandb.log({'train/loss_softmax': float(loss_softmax.data.item())}, step=self.global_count)
+                wandb.log({'train/loss_rotation': float(loss_rotation.data.item())}, step=self.global_count)
+
+
+                avg_loss_softmax += loss_softmax.data
+                avg_loss_rotation += loss_rotation
+                avg_acc_rotation = avg_acc_rotation+acc_rotation
+                wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
+                wandb.log({'train/acc_softmax': acc}, step=self.global_count)
+            else:
+                loss, acc = self.forward_loss(x,y)
+                wandb.log({'train/loss_softmax': float(loss.data.item())}, step=self.global_count)
+                wandb.log({'train/acc_softmax': acc}, step=self.global_count)
+
+            avg_loss = avg_loss+loss.data
+            avg_acc_softmax = avg_acc_softmax+acc                
+            wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
+            loss.backward()
+            optimizer.step()
+
+            if scheduler is not None:
+                scheduler.step()
+                wandb.log({'train/lr': optimizer.param_groups[0]['lr']}, step=self.global_count)                
+
+            if (i+1) % print_freq==0:
                 if self.jigsaw:
-                    loss_jigsaw, acc_jigsaw = self.forward_loss(patches=inputs[1][2], patches_label=inputs[1][3], unlabel_only=True)
-                    loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_jigsaw
-                    writer.add_scalar('train/loss_softmax', float(loss_softmax.data.item()), self.global_count)
-                    writer.add_scalar('train/loss_jigsaw', float(loss_jigsaw), self.global_count)
-                    wandb.log({'train/loss_softmax': float(loss_softmax.data.item())}, step=self.global_count)
-                    wandb.log({'train/loss_jigsaw': float(loss_jigsaw.data.item())}, step=self.global_count)
+                    print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Cls {:f} | Loss Jigsaw {:f} | Acc Cls {:f} | Acc Jigsaw {:f}'.\
+                        format(epoch+1, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_softmax/float(i+1), \
+                                avg_loss_jigsaw/float(i+1), avg_acc_softmax/float(i+1), avg_acc_jigsaw/float(i+1)))
                 elif self.rotation:
-                    loss_rotation, acc_rotation = self.forward_loss(patches=inputs[1][2], patches_label=inputs[1][3], unlabel_only=True)
-                    loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_rotation
-                    writer.add_scalar('train/loss_softmax', float(loss_softmax.data.item()), self.global_count)
-                    writer.add_scalar('train/loss_rotation', float(loss_rotation), self.global_count)
-                    wandb.log({'train/loss_softmax': float(loss_softmax.data.item())}, step=self.global_count)
-                    wandb.log({'train/loss_rotation': float(loss_rotation.data.item())}, step=self.global_count)
+                    print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Cls {:f} | Loss Rotation {:f} | Acc Cls {:f} | Acc Rotation {:f}'.\
+                        format(epoch+1, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_softmax/float(i+1), \
+                                avg_loss_rotation/float(i+1), avg_acc_softmax/float(i+1), avg_acc_rotation/float(i+1)))
                 else:
-                    loss, acc = self.forward_loss(x,y)
-                writer.add_scalar('train/loss', float(loss.data.item()), self.global_count)
-                wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
-                loss.backward()
-                optimizer.step()
-
-                if scheduler is not None:
-                    scheduler.step()
-                    writer.add_scalar('train/lr', optimizer.param_groups[0]['lr'], self.global_count)
-                    wandb.log({'train/lr': optimizer.param_groups[0]['lr']}, step=self.global_count)
-
-                avg_loss = avg_loss+loss.data#[0]
-                avg_acc_proto = avg_acc_proto+acc
-
-                writer.add_scalar('train/acc_cls', acc, self.global_count)
-                wandb.log({'train/acc_cls': acc}, step=self.global_count)
-
-                if self.jigsaw:
-                    avg_loss_softmax += loss_softmax.data
-                    avg_loss_jigsaw += loss_jigsaw
-                    avg_acc_jigsaw = avg_acc_jigsaw+acc_jigsaw
-                    writer.add_scalar('train/acc_jigsaw', acc_jigsaw, self.global_count)
-                    wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
-                elif self.rotation:
-                    avg_loss_softmax += loss_softmax.data
-                    avg_loss_rotation += loss_rotation
-                    avg_acc_rotation = avg_acc_rotation+acc_rotation
-                    writer.add_scalar('train/acc_rotation', acc_rotation, self.global_count)
-                    wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
-
-
-                if (i+1) % print_freq==0:
-                    if self.jigsaw:
-                        print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Cls {:f} | Loss Jigsaw {:f} | Acc Cls {:f} | Acc Jigsaw {:f}'.\
-                            format(epoch+1, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_softmax/float(i+1), \
-                                    avg_loss_jigsaw/float(i+1), avg_acc_proto/float(i+1), avg_acc_jigsaw/float(i+1)))
-                    elif self.rotation:
-                        print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Cls {:f} | Loss Rotation {:f} | Acc Cls {:f} | Acc Rotation {:f}'.\
-                            format(epoch+1, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_softmax/float(i+1), \
-                                    avg_loss_rotation/float(i+1), avg_acc_proto/float(i+1), avg_acc_rotation/float(i+1)))
-                    else:
-                        print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Acc Cls {:f}'.format(epoch+1, i+1, \
-                                        len(train_loader), avg_loss/float(i+1), avg_acc_proto/float(i+1)  ))
-
-        else:
-            for i, inputs in enumerate(train_loader):
-                self.global_count += 1
-                x = inputs[0]
-                y = inputs[1]
-                optimizer.zero_grad()
-                if self.jigsaw:
-                    loss_softmax, loss_jigsaw, acc, acc_jigsaw = self.forward_loss(x, y, inputs[2], inputs[3])
-                    loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_jigsaw
-                    wandb.log({'train/loss_softmax': float(loss_softmax.data.item())}, step=self.global_count)
-                    wandb.log({'train/loss_jigsaw': float(loss_jigsaw.data.item())}, step=self.global_count)
-                    
-                    avg_loss_softmax += loss_softmax.data
-                    avg_loss_jigsaw += loss_jigsaw
-                    avg_acc_jigsaw = avg_acc_jigsaw+acc_jigsaw
-                    wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
-                    wandb.log({'train/acc_proto': acc}, step=self.global_count)
-                    
-                elif self.rotation:
-                    loss_softmax, loss_rotation, acc, acc_rotation = self.forward_loss(x, y, inputs[2], inputs[3])
-                    loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_rotation
-                    wandb.log({'train/loss_softmax': float(loss_softmax.data.item())}, step=self.global_count)
-                    wandb.log({'train/loss_rotation': float(loss_rotation.data.item())}, step=self.global_count)
-                    
-                    
-                    avg_loss_softmax += loss_softmax.data
-                    avg_loss_rotation += loss_rotation
-                    avg_acc_rotation = avg_acc_rotation+acc_rotation
-                    wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
-                    wandb.log({'train/acc_proto': acc}, step=self.global_count)
-                else:
-                    loss, acc = self.forward_loss(x,y)
-                    wandb.log({'train/loss_softmax': float(loss.data.item())}, step=self.global_count)
-                    wandb.log({'train/acc_proto': acc}, step=self.global_count)
-                
-                avg_loss = avg_loss+loss.data
-                avg_acc_proto = avg_acc_proto+acc                
-                wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
-                loss.backward()
-                optimizer.step()
-
-                if scheduler is not None:
-                    scheduler.step()
-                    wandb.log({'train/lr': optimizer.param_groups[0]['lr']}, step=self.global_count)                
-
-                if (i+1) % print_freq==0:
-                    if self.jigsaw:
-                        print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Cls {:f} | Loss Jigsaw {:f} | Acc Cls {:f} | Acc Jigsaw {:f}'.\
-                            format(epoch+1, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_softmax/float(i+1), \
-                                    avg_loss_jigsaw/float(i+1), avg_acc_proto/float(i+1), avg_acc_jigsaw/float(i+1)))
-                    elif self.rotation:
-                        print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Cls {:f} | Loss Rotation {:f} | Acc Cls {:f} | Acc Rotation {:f}'.\
-                            format(epoch+1, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_softmax/float(i+1), \
-                                    avg_loss_rotation/float(i+1), avg_acc_proto/float(i+1), avg_acc_rotation/float(i+1)))
-                    else:
-                        print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Acc Cls {:f}'.format(epoch+1, i+1, \
-                                        len(train_loader), avg_loss/float(i+1), avg_acc_proto/float(i+1)  ))
+                    print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Acc Cls {:f}'.format(epoch+1, i+1, \
+                                    len(train_loader), avg_loss/float(i+1), avg_acc_softmax/float(i+1)  ))
                          
     def test_loop(self, val_loader=None):
         if val_loader is not None:
@@ -314,60 +314,51 @@ class BaselineTrain(nn.Module):
 
 
     def test_loop_with_loss(self, val_loader=None):
-        if val_loader is not None:
-            num_correct = 0
-            num_total = 0
-            num_correct_jigsaw = 0
-            num_total_jigsaw = 0
-            num_correct_rotation= 0
-            num_total_rotation = 0
-            
-            avg_loss=0
-            avg_loss_softmax=0
-            avg_loss_jigsaw=0
-            avg_loss_rotation=0
-            
-            for i, inputs in enumerate(val_loader):
-                x = inputs[0]
-                y = inputs[1]
-                if self.jigsaw:
-                    loss_softmax, loss_jigsaw, acc, acc_jigsaw = self.forward_loss(x, y, inputs[2], inputs[3])
-                    loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_jigsaw
-                    num_correct_jigsaw = int(acc_jigsaw*len(inputs[3]))
-                    num_total_jigsaw += len(inputs[3].view(-1))
-                    avg_loss_jigsaw += loss_jigsaw
-                elif self.rotation:
-                    loss_softmax, loss_rotation, acc, acc_rotation = self.forward_loss(x, y, inputs[2], inputs[3])
-                    loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_rotation
-                    num_correct_rotation = int(acc_rotation*len(inputs[3]))
-                    num_total_rotation += len(inputs[3].view(-1))
-                    avg_loss_rotation += loss_rotation
-                else:
-                    loss, acc = self.forward_loss(x,y)
-                    loss_softmax = loss
-                    
-                num_correct += int(acc*x.shape[0])
-                num_total += len(y)
-                
-                avg_loss += loss
-                avg_loss_softmax += loss_softmax
-                
-            avg_loss /= len(val_loader)
-            avg_loss_softmax /= len(val_loader)
-            avg_loss_rotation /= len(val_loader)
-            avg_loss_jigsaw /= len(val_loader)
-            
-            if self.jigsaw:
-                return (num_correct*100.0/num_total, num_correct_jigsaw*100.0/num_total_jigsaw), (avg_loss, avg_loss_softmax, avg_loss_jigsaw)
-            elif self.rotation:
-                return (num_correct*100.0/num_total, num_correct_rotation*100.0/num_total_rotation), (avg_loss, avg_loss_softmax, avg_loss_rotation)
-            else:
-                return (num_correct*100.0/num_total), (avg_loss, avg_loss_softmax)
+        num_correct = 0
+        num_total = 0
+        num_correct_jigsaw = 0
+        num_total_jigsaw = 0
+        num_correct_rotation= 0
+        num_total_rotation = 0
 
-        else:
+        avg_loss=0
+        avg_loss_softmax=0
+        avg_loss_jigsaw=0
+        avg_loss_rotation=0
+
+        for i, inputs in enumerate(val_loader):
+            x = inputs[0]
+            y = inputs[1]
             if self.jigsaw:
-                return -1, -1
+                loss_softmax, loss_jigsaw, acc, acc_jigsaw = self.forward_loss(x, y, inputs[2], inputs[3])
+                loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_jigsaw
+                num_correct_jigsaw = int(acc_jigsaw*len(inputs[3]))
+                num_total_jigsaw += len(inputs[3].view(-1))
+                avg_loss_jigsaw += loss_jigsaw
             elif self.rotation:
-                return -1, -1
+                loss_softmax, loss_rotation, acc, acc_rotation = self.forward_loss(x, y, inputs[2], inputs[3])
+                loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_rotation
+                num_correct_rotation = int(acc_rotation*len(inputs[3]))
+                num_total_rotation += len(inputs[3].view(-1))
+                avg_loss_rotation += loss_rotation
             else:
-                return -1 #no validation, just save model during iteration
+                loss, acc = self.forward_loss(x,y)
+                loss_softmax = loss
+
+            num_correct += int(acc*x.shape[0])
+            num_total += len(y)
+
+            avg_loss += loss
+            avg_loss_softmax += loss_softmax
+
+        avg_loss /= len(val_loader)
+        avg_loss_softmax /= len(val_loader)
+        avg_loss_rotation /= len(val_loader)
+        avg_loss_jigsaw /= len(val_loader)
+
+        if self.jigsaw:
+            return (num_correct*100.0/num_total, num_correct_jigsaw*100.0/num_total_jigsaw), (avg_loss, avg_loss_softmax, avg_loss_jigsaw)
+        elif self.rotation:
+            return (num_correct*100.0/num_total, num_correct_rotation*100.0/num_total_rotation), (avg_loss, avg_loss_softmax, avg_loss_rotation)
+        else:
+            return (num_correct*100.0/num_total), (avg_loss, avg_loss_softmax)

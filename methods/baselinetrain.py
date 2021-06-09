@@ -279,18 +279,17 @@ class BaselineTrain(nn.Module):
             num_total = 0
             num_correct_jigsaw = 0
             num_total_jigsaw = 0
-
             for i, inputs in enumerate(val_loader):
                 x = inputs[0]
                 y = inputs[1]
                 if self.jigsaw:
-                    loss_softmax, loss_jigsaw, acc, acc_jigsaw = self.forward_loss(x, y, inputs[2], inputs[3])
-                    loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_jigsaw
+                    loss_proto, loss_jigsaw, acc, acc_jigsaw = self.forward_loss(x, y, inputs[2], inputs[3])
+                    loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_jigsaw
                     num_correct_jigsaw = int(acc_jigsaw*len(inputs[3]))
                     num_total_jigsaw += len(inputs[3].view(-1))
                 elif self.rotation:
-                    loss_softmax, loss_rotation, acc, acc_rotation = self.forward_loss(x, y, inputs[2], inputs[3])
-                    loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_rotation
+                    loss_proto, loss_rotation, acc, acc_rotation = self.forward_loss(x, y, inputs[2], inputs[3])
+                    loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_rotation
                     num_correct_jigsaw = int(acc_jigsaw*len(inputs[3]))
                     num_total_jigsaw += len(inputs[3].view(-1))
                 else:
@@ -301,73 +300,55 @@ class BaselineTrain(nn.Module):
             if self.jigsaw or self.rotation:
                 return num_correct*100.0/num_total, num_correct_jigsaw*100.0/num_total_jigsaw
             else:
-                print("Validation loader inside BaselineTrain: ", num_correct*100.0/num_total)
                 return num_correct*100.0/num_total
-
-        else:
-            if self.jigsaw:
-                return -1, -1
-            elif self.rotation:
-                return -1, -1
-            else:
-                return -1 #no validation, just save model during iteration
 
 
     def test_loop_with_loss(self, val_loader=None):
-        if val_loader is not None:
-            num_correct = 0
-            num_total = 0
-            num_correct_jigsaw = 0
-            num_total_jigsaw = 0
-            num_correct_rotation= 0
-            num_total_rotation = 0
-            
-            avg_loss=0
-            avg_loss_softmax=0
-            avg_loss_jigsaw=0
-            avg_loss_rotation=0
-            
-            for i, inputs in enumerate(val_loader):
-                x = inputs[0]
-                y = inputs[1]
-                if self.jigsaw:
-                    loss_softmax, loss_jigsaw, acc, acc_jigsaw = self.forward_loss(x, y, inputs[2], inputs[3])
-                    loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_jigsaw
-                    num_correct_jigsaw = int(acc_jigsaw*len(inputs[3]))
-                    num_total_jigsaw += len(inputs[3].view(-1))
-                    avg_loss_jigsaw += loss_jigsaw
-                elif self.rotation:
-                    loss_softmax, loss_rotation, acc, acc_rotation = self.forward_loss(x, y, inputs[2], inputs[3])
-                    loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_rotation
-                    num_correct_rotation = int(acc_rotation*len(inputs[3]))
-                    num_total_rotation += len(inputs[3].view(-1))
-                    avg_loss_rotation += loss_rotation
-                else:
-                    loss, acc = self.forward_loss(x,y)
-                    loss_softmax = loss
-                    
-                num_correct += int(acc*x.shape[0])
-                num_total += len(y)
-                
-                avg_loss += loss
-                avg_loss_softmax += loss_softmax
-                
-            avg_loss /= len(val_loader)
-            avg_loss_softmax /= len(val_loader)
-            avg_loss_rotation /= len(val_loader)
-            avg_loss_jigsaw /= len(val_loader)
-            
-            if self.jigsaw:
-                return (num_correct*100.0/num_total, num_correct_jigsaw*100.0/num_total_jigsaw), (avg_loss, avg_loss_softmax, avg_loss_jigsaw)
-            elif self.rotation:
-                return (num_correct*100.0/num_total, num_correct_rotation*100.0/num_total_rotation), (avg_loss, avg_loss_softmax, avg_loss_rotation)
-            else:
-                return (num_correct*100.0/num_total), (avg_loss, avg_loss_softmax)
+        num_correct = 0
+        num_total = 0
+        num_correct_jigsaw = 0
+        num_total_jigsaw = 0
+        num_correct_rotation= 0
+        num_total_rotation = 0
 
-        else:
+        avg_loss=0
+        avg_loss_softmax=0
+        avg_loss_jigsaw=0
+        avg_loss_rotation=0
+
+        for i, inputs in enumerate(val_loader):
+            x = inputs[0]
+            y = inputs[1]
             if self.jigsaw:
-                return -1, -1
+                loss_softmax, loss_jigsaw, acc, acc_jigsaw = self.forward_loss(x, y, inputs[2], inputs[3])
+                loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_jigsaw
+                num_correct_jigsaw = int(acc_jigsaw*len(inputs[3]))
+                num_total_jigsaw += len(inputs[3].view(-1))
+                avg_loss_jigsaw += loss_jigsaw
             elif self.rotation:
-                return -1, -1
+                loss_softmax, loss_rotation, acc, acc_rotation = self.forward_loss(x, y, inputs[2], inputs[3])
+                loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_rotation
+                num_correct_rotation = int(acc_rotation*len(inputs[3]))
+                num_total_rotation += len(inputs[3].view(-1))
+                avg_loss_rotation += loss_rotation
             else:
-                return -1 #no validation, just save model during iteration
+                loss, acc = self.forward_loss(x,y)
+                loss_softmax = loss
+
+            num_correct += int(acc*x.shape[0])
+            num_total += len(y)
+
+            avg_loss += loss
+            avg_loss_softmax += loss_softmax
+
+        avg_loss /= len(val_loader)
+        avg_loss_softmax /= len(val_loader)
+        avg_loss_rotation /= len(val_loader)
+        avg_loss_jigsaw /= len(val_loader)
+
+        if self.jigsaw:
+            return (num_correct*100.0/num_total, num_correct_jigsaw*100.0/num_total_jigsaw), (avg_loss, avg_loss_softmax, avg_loss_jigsaw)
+        elif self.rotation:
+            return (num_correct*100.0/num_total, num_correct_rotation*100.0/num_total_rotation), (avg_loss, avg_loss_softmax, avg_loss_rotation)
+        else:
+            return (num_correct*100.0/num_total), (avg_loss, avg_loss_softmax)
