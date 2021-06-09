@@ -23,7 +23,7 @@ checkpoint_dir = os.path.split(args.path)[0]
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir, exist_ok=True)
 
-model_epoch = torch.load(args.path)["epoch"]
+model_epoch = torch.load(wandb_path.name)["epoch"]
 
 restore_path = os.path.join(checkpoint_dir, f"{model_epoch}.tar")
 
