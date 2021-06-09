@@ -18,13 +18,17 @@ wandb.init(id=args.id, project="fsl_ssl", resume=True)
 
 wandb_path = wandb.restore(args.path)
 
-if not os.path.exists(os.path.split(args.path)[0]):
-    os.makedirs(os.path.split(args.path)[0], exist_ok=True)
+checkpoint_dir = os.path.split(args.path)[0]
 
-shutil.move(wandb_path.name, args.path)
+if not os.path.exists(checkpoint_dir):
+    os.makedirs(checkpoint_dir, exist_ok=True)
 
-print("Checkpoint restored at ", args.path)
+model_epoch = torch.load(args.path)["epoch"]
 
-print("The model's epoch is ", torch.load(args.path)["epoch"])
+restore_path = os.path.join(checkpoint_dir, f"{model_epoch}.tar")
 
-print("Please rename it to continue training")
+shutil.move(wandb_path.name, restore_path)
+
+print("Checkpoint restored at", restore_path)
+
+print("The model's epoch is", model_epoch)
