@@ -259,7 +259,7 @@ class BaselineTrain(nn.Module):
             if scheduler is not None:
                 scheduler.step()
                 wandb.log({'train/lr': optimizer.param_groups[0]['lr']}, step=self.global_count)                
-
+            
             if (i+1) % print_freq==0:
                 if self.jigsaw:
                     print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Cls {:f} | Loss Jigsaw {:f} | Acc Cls {:f} | Acc Jigsaw {:f}'.\
