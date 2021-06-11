@@ -70,8 +70,8 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
                 wandb.save(outfile)
 
         if ((epoch+1) % params.save_freq==0) or (epoch==stop_epoch-1):
-            outfile = os.path.join(params.checkpoint_dir, '{:d}.tar'.format(epoch))
-            torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
+#             outfile = os.path.join(params.checkpoint_dir, '{:d}.tar'.format(epoch))
+#             torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
             
             outfile_2 = os.path.join(params.checkpoint_dir, 'last_model.tar')
             torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile_2)
@@ -81,13 +81,17 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
     # return model
 
 if __name__=='__main__':
-    SEED = 10 
-    torch.manual_seed(SEED)
-    torch.cuda.manual_seed(SEED)
-    np.random.seed(SEED)
-    random.seed(SEED)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = True
+    """Set seed"""
+    seed = 42
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    os.environ["PYTHONHASHSEED"] = str(seed)
     
    
     params = parse_args('train')
