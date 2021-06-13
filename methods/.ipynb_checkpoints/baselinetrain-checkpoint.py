@@ -1,13 +1,9 @@
-# Store a model inside this. Any to() or train() or eval() calls should be changed to self.model.train etc. --> it will. We use the model only for forward passes?
-
-# Or override self.forward, self.train etc. to the inner model
-# DDP the inner self.model
-
 import backbone
 import utils
 
 import torch
 import torch.nn as nn
+import dill
 from torch.autograd import Variable
 import numpy as np
 import torch.nn.functional as F
@@ -18,14 +14,16 @@ import wandb
 
 
 class BaselineTrainModel(nn.Module):
-    def __init__(self, model_func, loss_type, jigsaw, rotation):
+    def __init__(self, model_func, num_class, loss_type, jigsaw, rotation, tracking, pretrain):
         super(BaselineTrainModel, self).__init__()
         
         self.model_func = model_func
         self.loss_type = loss_type
         self.jigsaw = jigsaw
         self.rotation = rotation
-               
+        self.tracking = tracking
+        self.pretrain = pretrain
+        
         if isinstance(model_func,str):
             if model_func == 'resnet18':
                 self.feature = ResidualNet('ImageNet', 18, 1000, None, tracking=self.tracking)
@@ -105,16 +103,14 @@ class BaselineTrain(nn.Module):
         self.loss_fn = nn.CrossEntropyLoss()
         self.global_count = 0
 
-        self.model = BaselineTrainModel(model_func, loss_type, jigsaw, rotation)
+        self.model = BaselineTrainModel(model_func, num_class, loss_type, jigsaw, rotation, tracking, pretrain)
         
         self.gpu = gpu       
         
         
-#     def forward(self,x, feature=False, fc6=False, fc7=False, classifier_jigsaw=False, classifier_rotation=False):
-#         return self.model.forward(x, feature, fc6, fc7, classifier_jigsaw, classifier_rotation)
-
     def forward_loss(self, x=None, y=None, patches=None, patches_label=None, unlabel_only=False, label_only=False):
         # import ipdb; ipdb.set_trace()
+        x = x.cuda(self.gpu)
         if not unlabel_only:
             scores = self.model(x)
             y = Variable(y.cuda(self.gpu))
@@ -172,7 +168,7 @@ class BaselineTrain(nn.Module):
         else:
             return self.loss_fn(scores, y), acc
     
-    def train_loop(self, epoch, train_loader, optimizer, writer, scheduler=None, base_loader_u=None):
+    def train_loop(self, epoch, train_loader, optimizer, scheduler=None, base_loader_u=None):
         print_freq = min(50,len(train_loader))
         avg_loss=0
         avg_loss_softmax=0
@@ -193,46 +189,37 @@ class BaselineTrain(nn.Module):
 #                 if self.jigsaw:
 #                     loss_jigsaw, acc_jigsaw = self.forward_loss(patches=inputs[1][2], patches_label=inputs[1][3], unlabel_only=True)
 #                     loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_jigsaw
-#                     writer.add_scalar('train/loss_softmax', float(loss_softmax.data.item()), self.global_count)
-#                     writer.add_scalar('train/loss_jigsaw', float(loss_jigsaw), self.global_count)
 #                     wandb.log({'train/loss_softmax': float(loss_softmax.data.item())}, step=self.global_count)
 #                     wandb.log({'train/loss_jigsaw': float(loss_jigsaw.data.item())}, step=self.global_count)
 #                 elif self.rotation:
 #                     loss_rotation, acc_rotation = self.forward_loss(patches=inputs[1][2], patches_label=inputs[1][3], unlabel_only=True)
 #                     loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_rotation
-#                     writer.add_scalar('train/loss_softmax', float(loss_softmax.data.item()), self.global_count)
-#                     writer.add_scalar('train/loss_rotation', float(loss_rotation), self.global_count)
 #                     wandb.log({'train/loss_softmax': float(loss_softmax.data.item())}, step=self.global_count)
 #                     wandb.log({'train/loss_rotation': float(loss_rotation.data.item())}, step=self.global_count)
 #                 else:
 #                     loss, acc = self.forward_loss(x,y)
-#                 writer.add_scalar('train/loss', float(loss.data.item()), self.global_count)
 #                 wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
 #                 loss.backward()
 #                 optimizer.step()
 
 #                 if scheduler is not None:
 #                     scheduler.step()
-#                     writer.add_scalar('train/lr', optimizer.param_groups[0]['lr'], self.global_count)
 #                     wandb.log({'train/lr': optimizer.param_groups[0]['lr']}, step=self.global_count)
 
 #                 avg_loss = avg_loss+loss.data#[0]
 #                 avg_acc_softmax = avg_acc_softmax+acc
 
-#                 writer.add_scalar('train/acc_cls', acc, self.global_count)
 #                 wandb.log({'train/acc_cls': acc}, step=self.global_count)
 
 #                 if self.jigsaw:
 #                     avg_loss_softmax += loss_softmax.data
 #                     avg_loss_jigsaw += loss_jigsaw
 #                     avg_acc_jigsaw = avg_acc_jigsaw+acc_jigsaw
-#                     writer.add_scalar('train/acc_jigsaw', acc_jigsaw, self.global_count)
 #                     wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
 #                 elif self.rotation:
 #                     avg_loss_softmax += loss_softmax.data
 #                     avg_loss_rotation += loss_rotation
 #                     avg_acc_rotation = avg_acc_rotation+acc_rotation
-#                     writer.add_scalar('train/acc_rotation', acc_rotation, self.global_count)
 #                     wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
 
 
@@ -250,7 +237,18 @@ class BaselineTrain(nn.Module):
 #                                         len(train_loader), avg_loss/float(i+1), avg_acc_softmax/float(i+1)  ))
 
 #         else:
-        for i, inputs in enumerate(train_loader):
+    
+    
+        iterator = iter(train_loader)
+        i = -1
+        print("Created iterator!")
+
+        while True:
+            i += 1
+            try:
+                inputs = next(iterator)
+            except StopIteration:
+                break
             self.global_count += 1
             x = inputs[0]
             y = inputs[1]
@@ -297,14 +295,14 @@ class BaselineTrain(nn.Module):
             if (i+1) % print_freq==0:
                 if self.jigsaw:
                     print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Cls {:f} | Loss Jigsaw {:f} | Acc Cls {:f} | Acc Jigsaw {:f}'.\
-                        format(epoch+1, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_softmax/float(i+1), \
+                        format(epoch, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_softmax/float(i+1), \
                                 avg_loss_jigsaw/float(i+1), avg_acc_softmax/float(i+1), avg_acc_jigsaw/float(i+1)))
                 elif self.rotation:
                     print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Cls {:f} | Loss Rotation {:f} | Acc Cls {:f} | Acc Rotation {:f}'.\
-                        format(epoch+1, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_softmax/float(i+1), \
+                        format(epoch, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_softmax/float(i+1), \
                                 avg_loss_rotation/float(i+1), avg_acc_softmax/float(i+1), avg_acc_rotation/float(i+1)))
                 else:
-                    print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Acc Cls {:f}'.format(epoch+1, i+1, \
+                    print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Acc Cls {:f}'.format(epoch, i+1, \
                                     len(train_loader), avg_loss/float(i+1), avg_acc_softmax/float(i+1)  ))
                          
     def test_loop(self, val_loader=None):

@@ -9,6 +9,7 @@ import os
 import glob
 import random
 import datetime
+import dill
 
 import backbone
 from data.datamgr import SimpleDataManager, SetDataManager
@@ -38,7 +39,10 @@ def main(gpu=None, params=None):
         dist.init_process_group(backend='nccl', init_method='env://', world_size=params.world_size, rank=rank)
         torch.cuda.set_device(gpu)
         torch.cuda.manual_seed_all(params.seed)
+        
+        print("One process runs on gpu: ", gpu)
     else:
+        params.world_size = None
         rank = None
         
     isAircraft = (params.dataset == 'aircrafts')    
@@ -71,10 +75,10 @@ def main(gpu=None, params=None):
 
         if params.method == 'baseline':
             model           = BaselineTrain( model_dict[params.model], params.num_classes, \
-                                            jigsaw=params.jigsaw, lbda=params.lbda, rotation=params.rotation, tracking=params.tracking)
+                                            jigsaw=params.jigsaw, lbda=params.lbda, rotation=params.rotation, tracking=params.tracking, gpu=gpu)
         elif params.method == 'baseline++':
             model           = BaselineTrain( model_dict[params.model], params.num_classes, \
-                                            loss_type = 'dist', jigsaw=params.jigsaw, lbda=params.lbda, rotation=params.rotation, tracking=params.tracking)
+                                    loss_type = 'dist', jigsaw=params.jigsaw, lbda=params.lbda, rotation=params.rotation, tracking=params.tracking, gpu=gpu)
 
     elif params.method in ['protonet','matchingnet','relationnet', 'relationnet_softmax', 'maml', 'maml_approx']:
         n_query = max(1, int(params.n_query * params.test_n_way/params.train_n_way)) #if test_n_way is smaller than train_n_way, reduce n_query to keep batch size small
@@ -142,9 +146,10 @@ def main(gpu=None, params=None):
     if params.finetune:
         params.checkpoint_dir += '_finetune'
 
-    print('Checkpoint path:',params.checkpoint_dir)
-    if not os.path.isdir(params.checkpoint_dir):
-        os.makedirs(params.checkpoint_dir)
+    if not params.parallel or params.parallel and gpu == 0: 
+        print('Checkpoint path:',params.checkpoint_dir)
+        if not os.path.isdir(params.checkpoint_dir):
+            os.makedirs(params.checkpoint_dir)
 
     start_epoch = params.start_epoch
     stop_epoch = params.stop_epoch
@@ -214,61 +219,65 @@ def main(gpu=None, params=None):
     else:
        raise ValueError('Unknown optimization, please define by yourself')
 
-    eval_interval = 20
+    eval_interval = params.eval_interval
     max_acc = 0       
-
+    
+    if not params.parallel or params.parallel and gpu ==0: 
+        print("Evaluation will be done every %d epochs\n\n" % (eval_interval))
     accum_epoch_time = RunningAverage()
 
     for epoch in range(start_epoch,stop_epoch):
-        base_loader.sampler.set_epoch(epoch)
-        val_loader.sampler.set_epoch(epoch)
+        if params.parallel:
+            base_loader.sampler.set_epoch(epoch)
+            val_loader.sampler.set_epoch(epoch)
        
         start_time = time.time()
         model.model.train()
-        model.train_loop(epoch, base_loader, optimizer, writer) # CHECKED 
+        model.train_loop(epoch, base_loader, optimizer) # CHECKED 
         end_time = time.time()
         accum_epoch_time.update(end_time - start_time)
         eta = str(datetime.timedelta(seconds = int(accum_epoch_time() * (stop_epoch - epoch))))
         
-        print('Epoch %d complete; eta: %s' % (epoch, eta))
-        
-        wandb.log({"Epoch time": accum_epoch_time(), "Epoch": epoch}, step=model.global_count)
+        if not params.parallel or params.parallel and gpu ==0: 
+            print('Epoch %d complete; eta: %s' % (epoch, eta))
+            wandb.log({"Epoch time": accum_epoch_time(), "Epoch": epoch}, step=model.global_count)
 
-        if epoch % eval_interval == True or epoch == stop_epoch - 1: 
-            model.model.eval()
-            
-            if not os.path.isdir(params.checkpoint_dir):
-                os.makedirs(params.checkpoint_dir)
+            if epoch % eval_interval == True or epoch == stop_epoch - 1: 
+                print("Evaluating...")
+                model.model.eval()
 
-            if params.jigsaw:
-                acc, acc_jigsaw = model.test_loop( val_loader)
-                wandb.log({"val/acc_jigsaw": acc_jigsaw}, step=model.global_count)
-#                 wandb.log({"val/loss_jigsaw": avg_loss_jigsaw}, step=model.global_count)
-            elif params.rotation:
-                acc, acc_rotation = model.test_loop( val_loader)
-                wandb.log({"val/acc_rotation": acc_rotation}, step=model.global_count)
-#                 wandb.log({"val/loss_rotation": avg_loss_rotation}, step=model.global_count)
-            else:    
-                acc = model.test_loop( val_loader)
-                
-#             wandb.log({"val/loss_avg": avg_loss}, step=model.global_count)
-#             wandb.log({"val/loss_proto": avg_loss_proto}, step=model.global_count)
-            wandb.log({"val/acc": acc}, step=model.global_count)
-            
-            if acc > max_acc : #for baseline and baseline++, we don't use validation here so we let acc = -1
-                print("best model! save...")
-                max_acc = acc
-                outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
-                torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
-                wandb.save(outfile)
+                if not os.path.isdir(params.checkpoint_dir):
+                    os.makedirs(params.checkpoint_dir)
 
-        if ((epoch+1) % params.save_freq==0) or (epoch==stop_epoch-1):
-#             outfile = os.path.join(params.checkpoint_dir, '{:d}.tar'.format(epoch))
-#             torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
-            
-            outfile_2 = os.path.join(params.checkpoint_dir, 'last_model.tar')
-            torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile_2)
-            wandb.save(outfile_2)
+                if params.jigsaw:
+                    acc, acc_jigsaw = model.test_loop( val_loader)
+                    wandb.log({"val/acc_jigsaw": acc_jigsaw}, step=model.global_count)
+    #                 wandb.log({"val/loss_jigsaw": avg_loss_jigsaw}, step=model.global_count)
+                elif params.rotation:
+                    acc, acc_rotation = model.test_loop( val_loader)
+                    wandb.log({"val/acc_rotation": acc_rotation}, step=model.global_count)
+    #                 wandb.log({"val/loss_rotation": avg_loss_rotation}, step=model.global_count)
+                else:    
+                    acc = model.test_loop( val_loader)
+
+    #             wandb.log({"val/loss_avg": avg_loss}, step=model.global_count)
+    #             wandb.log({"val/loss_proto": avg_loss_proto}, step=model.global_count)
+                wandb.log({"val/acc": acc}, step=model.global_count)
+
+                if acc > max_acc : #for baseline and baseline++, we don't use validation here so we let acc = -1
+                    print("best model! save...")
+                    max_acc = acc
+                    outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
+                    torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
+                    wandb.save(outfile)
+
+            if ((epoch+1) % params.save_freq==0) or (epoch==stop_epoch-1):
+    #             outfile = os.path.join(params.checkpoint_dir, '{:d}.tar'.format(epoch))
+    #             torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
+
+                outfile_2 = os.path.join(params.checkpoint_dir, 'last_model.tar')
+                torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile_2)
+                wandb.save(outfile_2)
 
     
 
@@ -294,10 +303,16 @@ if __name__=='__main__':
 
     os.environ["CUDA_VISIBLE_DEVICES"] = params.devices
     
+    print("params.parallel = ", params.parallel)
+    
     if params.parallel:
+        
+        print("params.gpus = ", params.gpus)
+        print("params.devices = ", params.devices)
+
         os.environ['MASTER_ADDR'] = '127.0.0.1'
         os.environ['MASTER_PORT'] = '29534'
-        args.world_size = args.gpus * args.nodes
-        mp.spawn(main, nprocs=args.gpus, args=(params,))
+        params.world_size = params.gpus * params.nodes
+        mp.spawn(main, nprocs=params.gpus, args=(params,))
     else:
         main(gpu=0, params=params)

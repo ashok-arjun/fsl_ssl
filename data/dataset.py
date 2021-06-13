@@ -8,6 +8,7 @@ import torchvision.transforms as transforms
 import os
 identity = lambda x:x
 import math
+import random
 
 import torch.multiprocessing as mp
 import torch.distributed as dist
@@ -289,10 +290,10 @@ class DistributedSamplerWrapper(DistributedSampler):
     def __init__(
         self,
         sampler,
-        num_replicas: Optional[int] = None,
-        rank: Optional[int] = None,
-        shuffle: bool = True,
-        seed: int = 0
+        num_replicas = None,
+        rank = None,
+        shuffle = True,
+        seed = 0
     ):
         """
         Args:
