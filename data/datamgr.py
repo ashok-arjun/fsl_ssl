@@ -5,7 +5,7 @@ from PIL import Image
 import numpy as np
 import torchvision.transforms as transforms
 import data.additional_transforms as add_transforms
-from data.dataset import SimpleDataset, SetDataset, EpisodicBatchSampler, DistributedSamplerWrapper
+from data.dataset import SimpleDataset, SetDataset, EpisodicBatchSampler, DistributedSamplerWrapper, DistributedBatchSampler
 from abc import abstractmethod
 
 import torch.multiprocessing as mp
@@ -208,9 +208,9 @@ class SetDataManager(DataManager):
         
         if not self.parallel:     
             data_loader_params = dict(batch_sampler = sampler,  num_workers = NUM_WORKERS, pin_memory = True) 
-        else:
-            sampler = DistributedSamplerWrapper(sampler, num_replicas=self.world_size, rank=self.rank, shuffle=True, seed=self.sampler_seed)
-            data_loader_params = dict(batch_sampler = sampler,  num_workers = NUM_WORKERS, pin_memory = True)
+        else:           
+            sampler = DistributedBatchSampler(sampler, num_replicas=self.world_size, rank=self.rank, shuffle=True, seed=self.sampler_seed)
+            data_loader_params = dict(batch_sampler = sampler, num_workers = NUM_WORKERS, pin_memory = True)
         data_loader = torch.utils.data.DataLoader(dataset, **data_loader_params)
         return data_loader
 

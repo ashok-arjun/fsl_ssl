@@ -12,15 +12,16 @@ from itertools import cycle
 
 import wandb
 
-class ProtoNet(MetaTemplate):
+class ProtoNetModel(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, jigsaw=False, lbda=0.0, rotation=False, tracking=False, use_bn=True, pretrain=False):
-        super(ProtoNet, self).__init__(model_func,  n_way, n_support, use_bn, pretrain, tracking=tracking)
+        super(ProtoNetModel, self).__init__(model_func,  n_way, n_support, use_bn, pretrain, tracking=tracking)
         self.loss_fn = nn.CrossEntropyLoss()
 
         self.jigsaw = jigsaw
         self.rotation = rotation
         self.lbda = lbda
         self.global_count = 0
+
         if self.jigsaw:
             self.fc6 = nn.Sequential()
             self.fc6.add_module('fc6_s1',nn.Linear(512, 512))#for resnet
@@ -47,13 +48,19 @@ class ProtoNet(MetaTemplate):
 
             self.classifier_rotation = nn.Sequential()
             self.classifier_rotation.add_module('fc8',nn.Linear(128, 4))
-
-
-        # FOR DDP
         
-        # model = (some model), plae fc7 classifier etc. in side that. Make that inherit MetaTemplate. Leave this as nn.Module            
+class ProtoNet(MetaTemplate):
+    def __init__(self, model_func,  n_way, n_support, jigsaw=False, lbda=0.0, rotation=False, tracking=False, use_bn=True, pretrain=False):
+        super(ProtoNet, self).__init__(model_func,  n_way, n_support, use_bn, pretrain, tracking=tracking)
+        self.loss_fn = nn.CrossEntropyLoss()
+
+        self.jigsaw = jigsaw
+        self.rotation = rotation
+        self.lbda = lbda
+        self.global_count = 0
+        self.model = ProtoNetModel(model_func,  n_way, n_support, jigsaw, lbda, rotation, tracking, use_bn, pretrain)
             
-    def train_loop(self, epoch, train_loader, optimizer, writer, base_loader_u=None):
+    def train_loop(self, epoch, train_loader, optimizer, base_loader_u=None):
         print_freq = 10
         avg_loss=0
         avg_loss_proto=0
@@ -347,33 +354,33 @@ class ProtoNet(MetaTemplate):
         if self.jigsaw:
             patches = patches.view(B*T,C,H,W).cuda()#torch.Size([675, 3, 64, 64])
             if self.dual_cbam:
-                patch_feat = self.feature(patches, jigsaw=True)#torch.Size([675, 512])
+                patch_feat = self.model.feature(patches, jigsaw=True)#torch.Size([675, 512])
             else:
-                patch_feat = self.feature(patches)#torch.Size([675, 512])
+                patch_feat = self.model.feature(patches)#torch.Size([675, 512])
 
             x_ = patch_feat.view(B,T,-1)
             x_ = x_.transpose(0,1)#torch.Size([9, 75, 512])
 
             x_list = []
             for i in range(9):
-                z = self.fc6(x_[i])#torch.Size([75, 512])
+                z = self.model.fc6(x_[i])#torch.Size([75, 512])
                 z = z.view([B,1,-1])#torch.Size([75, 1, 512])
                 x_list.append(z)
 
             x_ = torch.cat(x_list,1)#torch.Size([75, 9, 512])
-            x_ = self.fc7(x_.view(B,-1))#torch.Size([75, 9*512])
-            x_ = self.classifier(x_)
+            x_ = self.model.fc7(x_.view(B,-1))#torch.Size([75, 9*512])
+            x_ = self.model.classifier(x_)
 
             y_ = patches_label.view(-1).cuda()
 
             return x_, y_
         elif self.rotation:
             patches = patches.view(B*T,C,H,W).cuda()
-            x_ = self.feature(patches)#torch.Size([64, 512, 1, 1])
+            x_ = self.model.feature(patches)#torch.Size([64, 512, 1, 1])
             x_ = x_.squeeze()
-            x_ = self.fc6(x_)
-            x_ = self.fc7(x_)#64,128
-            x_ = self.classifier_rotation(x_)#64,4
+            x_ = self.model.fc6(x_)
+            x_ = self.model.fc7(x_)#64,128
+            x_ = self.model.classifier_rotation(x_)#64,4
             pred = torch.max(x_,1)
             y_ = patches_label.view(-1).cuda()
             return x_, y_
@@ -412,7 +419,7 @@ class ProtoNet(MetaTemplate):
             z_all = x
         else:
             x           = x.contiguous().view( self.n_way * (self.n_support + self.n_query), *x.size()[2:])
-            z_all       = self.feature(x)
+            z_all       = self.model.feature(x)
             z_all       = z_all.view( self.n_way, self.n_support + self.n_query, -1)
         z_support   = z_all[:, :self.n_support]
         z_query     = z_all[:, self.n_support:]
