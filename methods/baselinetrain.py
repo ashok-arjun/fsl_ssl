@@ -110,9 +110,6 @@ class BaselineTrain(nn.Module):
         self.gpu = gpu       
         
         
-#     def forward(self,x, feature=False, fc6=False, fc7=False, classifier_jigsaw=False, classifier_rotation=False):
-#         return self.model.forward(x, feature, fc6, fc7, classifier_jigsaw, classifier_rotation)
-
     def forward_loss(self, x=None, y=None, patches=None, patches_label=None, unlabel_only=False, label_only=False):
         # import ipdb; ipdb.set_trace()
         if not unlabel_only:

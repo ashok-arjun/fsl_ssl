@@ -66,7 +66,7 @@ def parse_args(script):
         parser.add_argument('--resume'      , action='store_true',  help='continue from previous trained model with largest epoch')
         parser.add_argument('--resume_wandb_id'      , default=None,  help='wandb ID')
         parser.add_argument('--warmup'      , action='store_true',  help='continue from baseline, neglected if resume is true') #never used in the paper
-        parser.add_argument('--device'      ,  default="0", type=str, help='GPU id') # If multiple and --parallel=True, give gpus with commas - eg. "0,1"
+        parser.add_argument('--devices'      ,  default="0", type=str, help='GPU id') # If multiple and --parallel=True, give gpus with commas - eg. "0,1"
         
         
         # PARALLEL
