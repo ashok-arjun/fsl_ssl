@@ -8,6 +8,11 @@ import data.additional_transforms as add_transforms
 from data.dataset import SimpleDataset, SetDataset, EpisodicBatchSampler
 from abc import abstractmethod
 
+import torch.multiprocessing as mp
+import torch.distributed as dist
+from torch.utils.data.distributed import DistributedSampler as DS
+
+
 NUM_WORKERS=8
 
 class TransformLoader:
@@ -54,7 +59,7 @@ class DataManager:
 
 
 class SimpleDataManager(DataManager):
-    def __init__(self, image_size, batch_size, jigsaw=False, rotation=False, isAircraft=False, grey=False, return_name=False, drop_last=False, shuffle=True):
+    def __init__(self, image_size, batch_size, jigsaw=False, rotation=False, isAircraft=False, grey=False, return_name=False, drop_last=False, shuffle=True, parallel=False, rank=None, world_size=None, sampler_seed=None):
         super(SimpleDataManager, self).__init__()
         self.batch_size = batch_size
         if grey:
@@ -69,7 +74,13 @@ class SimpleDataManager(DataManager):
         self.return_name = return_name
         self.drop_last = drop_last
         self.shuffle = shuffle
+        
+        self.parallel = parallel
+        self.rank = rank
+        self.world_size = world_size
+        self.sampler_seed = sampler_seed
 
+       
     def get_data_loader(self, data_file, aug): #parameters that would change on train/val set
         transform = self.trans_loader.get_composed_transform(aug)
 
@@ -111,7 +122,11 @@ class SimpleDataManager(DataManager):
         dataset = SimpleDataset(data_file, transform, jigsaw=self.jigsaw, \
                     transform_jigsaw=self.transform_jigsaw, transform_patch_jigsaw=self.transform_patch_jigsaw, \
                     rotation=self.rotation, isAircraft=self.isAircraft, grey=self.grey, return_name=self.return_name)
-        data_loader_params = dict(batch_size = self.batch_size, shuffle = self.shuffle, num_workers = NUM_WORKERS, pin_memory = True, drop_last=self.drop_last)       
+        
+        if not self.parallel:            
+            data_loader_params = dict(batch_size = self.batch_size, shuffle = self.shuffle, num_workers = NUM_WORKERS, pin_memory = True, drop_last=self.drop_last)   
+        else:
+            data_loader_params = dict(batch_size = self.batch_size, shuffle = False, num_workers = NUM_WORKERS, pin_memory = True, drop_last=self.drop_last, sampler = DS(dataset, num_replicas=self.world_size, rank=self.rank, shuffle=True, seed=self.seed))   
         data_loader = torch.utils.data.DataLoader(dataset, **data_loader_params)
 
         return data_loader

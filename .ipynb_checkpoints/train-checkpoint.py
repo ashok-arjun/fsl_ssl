@@ -26,6 +26,10 @@ from utils import RunningAverage
 
 import wandb
 
+import torch.multiprocessing as mp
+import torch.distributed as dist
+from torch.utils.data.distributed import DistributedSampler as DS
+
 
 def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):    
     if params.optimization == 'Adam':
@@ -92,31 +96,18 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
 
     # only two models are uploaded in each run - the best one and the last one
     # return model
-
-if __name__=='__main__':
-    """Set seed"""
-    seed = 42
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-    os.environ["PYTHONHASHSEED"] = str(seed)
     
-   
-    params = parse_args('train')
-
-    if not params.committed:
-        print("Commit the code and then execute with the --committed arg")
-        exit()
-
-
-    os.environ["CUDA_VISIBLE_DEVICES"] = params.device
-
-
+    
+def main(gpu=None, params=None):
+    
+    if params.parallel:
+        rank = params.nr * params.gpus + gpu
+        dist.init_process_group(backend='nccl', init_method='env://', world_size=params.world_size, rank=rank)
+        torch.cuda.set_device(gpu)
+        torch.cuda.manual_seed_all(params.seed)
+    else:
+        rank = None
+        
     isAircraft = (params.dataset == 'aircrafts')    
         
     base_file = os.path.join('filelists', params.dataset, params.base+'.json')
@@ -125,9 +116,9 @@ if __name__=='__main__':
     image_size = params.image_size
 
     if params.method in ['baseline', 'baseline++'] :
-        base_datamgr    = SimpleDataManager(image_size, batch_size = params.bs, jigsaw=params.jigsaw, rotation=params.rotation, isAircraft=isAircraft)
+        base_datamgr    = SimpleDataManager(image_size, batch_size = params.bs, jigsaw=params.jigsaw, rotation=params.rotation, isAircraft=isAircraft, parallel=params.parallel, rank=rank, world_size=params.world_size, sampler_seed=params.seed)
         base_loader     = base_datamgr.get_data_loader( base_file , aug = params.train_aug )
-        val_datamgr     = SimpleDataManager(image_size, batch_size = params.bs, jigsaw=params.jigsaw, rotation=params.rotation, isAircraft=isAircraft)
+        val_datamgr     = SimpleDataManager(image_size, batch_size = params.bs, jigsaw=params.jigsaw, rotation=params.rotation, isAircraft=isAircraft, parallel=params.parallel, rank=rank, world_size=params.world_size, sampler_seed=params.seed)
         val_loader      = val_datamgr.get_data_loader( val_file, aug = False)
 
         if params.dataset == 'CUB':
@@ -280,6 +271,37 @@ if __name__=='__main__':
     
     train(base_loader, val_loader,  model, start_epoch, stop_epoch, params)
 
+    
+
+if __name__=='__main__':
+       
+    params = parse_args('train')
+
+    """Set seed"""
+    seed = params.seed
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    os.environ["PYTHONHASHSEED"] = str(seed)
+        
+    if not params.committed:
+        print("Commit the code and then execute with the --committed arg")
+        exit()
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = params.device
+    
+    if params.parallel:
+        os.environ['MASTER_ADDR'] = '127.0.0.1'
+        os.environ['MASTER_PORT'] = '29534'
+        args.world_size = args.gpus * args.nodes
+        mp.spawn(main, nprocs=args.gpus, args=(params,))
+    else:
+        main(params=params)
 
 #     ##### from save_features.py (except maml)#####
 #     split = 'novel'

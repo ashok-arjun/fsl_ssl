@@ -21,6 +21,7 @@ model_dict = dict(
 
 def parse_args(script):
     parser = argparse.ArgumentParser(description= 'few-shot script %s' %(script))
+    parser.add_argument('--seed', default=42, type=int) # Never change
     parser.add_argument('--dataset'     , default='dogs',            help='CUB/cars/flowers/dogs/aircrafts/miniImagenet/tieredImagenet')
     parser.add_argument('--model'       , default='resnet18',       help='model: Conv{4|6} / ResNet{10|18|34|50|101}') # 50 and 101 are not used in the paper
     parser.add_argument('--method'      , default='protonet',       help='baseline/baseline++/protonet/matchingnet/relationnet{_softmax}/maml{_approx}') #relationnet_softmax replace L2 norm with softmax to expedite training, maml_approx use first-order approximation in the gradient for efficiency
@@ -55,6 +56,8 @@ def parse_args(script):
     parser.add_argument('--base_unlabel'     , default='base',      help='name of the json file of the base set for unlabeled dataset dataloader')
     # parser.add_argument("--device_ids", nargs="+", required=True, type=int) # [0] can be set as default
 
+    parser.add_argument('--committed', action='store_true')
+
     if script == 'train':
         parser.add_argument('--num_classes' , default=200, type=int,help='total number of classes in softmax, only used in baseline') #make it larger than the maximum label value in base class
         parser.add_argument('--save_freq'   , default=10, type=int,help='Save frequency')
@@ -63,7 +66,18 @@ def parse_args(script):
         parser.add_argument('--resume'      , action='store_true',  help='continue from previous trained model with largest epoch')
         parser.add_argument('--resume_wandb_id'      , default=None,  help='wandb ID')
         parser.add_argument('--warmup'      , action='store_true',  help='continue from baseline, neglected if resume is true') #never used in the paper
-        parser.add_argument('--device'      ,  default="0", type=str, help='GPU id')
+        parser.add_argument('--device'      ,  default="0", type=str, help='GPU id') # If multiple and --parallel=True, give gpus with commas - eg. "0,1"
+        
+        
+        # PARALLEL
+        
+        parser.add_argument('--parallel', default=False, action='store_true')
+        parser.add_argument('-n', '--nodes', default=1, type=int, metavar='N',
+                        help='number of data loading workers (default: 4)')
+        parser.add_argument('-g', '--gpus', default=1, type=int,
+                            help='number of gpus per node') # NOTE: very important
+        parser.add_argument('-nr', '--nr', default=0, type=int,
+                            help='ranking within the nodes')
 
     parser.add_argument('--layer', default=-1, type=int)
         
@@ -79,7 +93,7 @@ def get_resume_file(checkpoint_dir):
     if len(filelist) == 0:
         return None
 
-    filelist =  [ x  for x in filelist if os.path.basename(x) != 'best_model.tar' ]
+    filelist =  [ x  for x in filelist if not os.path.basename(x) in ['best_model.tar', 'last_model.tar'] ]
     epochs = np.array([int(os.path.splitext(os.path.basename(x))[0]) for x in filelist])
     max_epoch = np.max(epochs)
     resume_file = os.path.join(checkpoint_dir, '{:d}.tar'.format(max_epoch))
