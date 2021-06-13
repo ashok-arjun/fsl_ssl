@@ -48,7 +48,14 @@ class ProtoNetModel(MetaTemplate):
 
             self.classifier_rotation = nn.Sequential()
             self.classifier_rotation.add_module('fc8',nn.Linear(128, 4))
-        
+    
+    def forward(self,x, fc6=False, fc7=False):
+        if fc6:
+            return self.fc6(x)
+        elif fc7:
+            return self.fc7(x)
+
+        return self.feature(x)
 class ProtoNet(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, jigsaw=False, lbda=0.0, rotation=False, tracking=False, use_bn=True, pretrain=False):
         super(ProtoNet, self).__init__(model_func,  n_way, n_support, use_bn, pretrain, tracking=tracking)
@@ -354,21 +361,21 @@ class ProtoNet(MetaTemplate):
         if self.jigsaw:
             patches = patches.view(B*T,C,H,W).cuda()#torch.Size([675, 3, 64, 64])
             if self.dual_cbam:
-                patch_feat = self.model.feature(patches, jigsaw=True)#torch.Size([675, 512])
+                patch_feat = self.model.forward(patches, jigsaw=True)#torch.Size([675, 512])
             else:
-                patch_feat = self.model.feature(patches)#torch.Size([675, 512])
+                patch_feat = self.model.forward(patches)
 
             x_ = patch_feat.view(B,T,-1)
             x_ = x_.transpose(0,1)#torch.Size([9, 75, 512])
 
             x_list = []
             for i in range(9):
-                z = self.model.fc6(x_[i])#torch.Size([75, 512])
+                z = self.model.forward(x_[i], fc6=True)#torch.Size([75, 512])
                 z = z.view([B,1,-1])#torch.Size([75, 1, 512])
                 x_list.append(z)
 
             x_ = torch.cat(x_list,1)#torch.Size([75, 9, 512])
-            x_ = self.model.fc7(x_.view(B,-1))#torch.Size([75, 9*512])
+            x_ = self.model.forward(x_.view(B,-1), fc7=True)#torch.Size([75, 9*512])
             x_ = self.model.classifier(x_)
 
             y_ = patches_label.view(-1).cuda()
@@ -376,10 +383,10 @@ class ProtoNet(MetaTemplate):
             return x_, y_
         elif self.rotation:
             patches = patches.view(B*T,C,H,W).cuda()
-            x_ = self.model.feature(patches)#torch.Size([64, 512, 1, 1])
+            x_ = self.model.forward(patches)
             x_ = x_.squeeze()
-            x_ = self.model.fc6(x_)
-            x_ = self.model.fc7(x_)#64,128
+            x_ = self.model.forward(x_, fc6=True)
+            x_ = self.model.forward(x_, fc7=True)#64,128
             x_ = self.model.classifier_rotation(x_)#64,4
             pred = torch.max(x_,1)
             y_ = patches_label.view(-1).cuda()
@@ -419,7 +426,8 @@ class ProtoNet(MetaTemplate):
             z_all = x
         else:
             x           = x.contiguous().view( self.n_way * (self.n_support + self.n_query), *x.size()[2:])
-            z_all       = self.model.feature(x)
+            z_all       = self.model.forward(x)
+
             z_all       = z_all.view( self.n_way, self.n_support + self.n_query, -1)
         z_support   = z_all[:, :self.n_support]
         z_query     = z_all[:, self.n_support:]
