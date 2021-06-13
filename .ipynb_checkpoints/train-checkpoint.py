@@ -53,7 +53,7 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
         
         print('Epoch %d complete; eta: %s' % (epoch, eta))
         
-        wandb.log({"Epoch time": accum_epoch_time(), "Epoch": epoch})
+        wandb.log({"Epoch time": accum_epoch_time(), "Epoch": epoch}, step=model.global_count)
 
         if epoch % eval_interval == True or epoch == stop_epoch - 1: 
             model.eval()
