@@ -239,16 +239,7 @@ class BaselineTrain(nn.Module):
 #         else:
     
     
-        iterator = iter(train_loader)
-        i = -1
-        print("Created iterator!")
-
-        while True:
-            i += 1
-            try:
-                inputs = next(iterator)
-            except StopIteration:
-                break
+        for i, inputs in enumerate(train_loader):
             self.global_count += 1
             x = inputs[0]
             y = inputs[1]

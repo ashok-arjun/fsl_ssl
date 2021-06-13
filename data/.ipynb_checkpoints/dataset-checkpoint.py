@@ -6,7 +6,7 @@ import json
 import numpy as np
 import torchvision.transforms as transforms
 import os
-identity = lambda x:x
+
 import math
 import random
 
@@ -16,6 +16,8 @@ from torch.utils.data.distributed import DistributedSampler
 
 from torch.utils.data import Dataset, Sampler
 
+def identity(x):
+    return x
 
 # Below: just for safety, since DDP can be used. Should be removed later
 

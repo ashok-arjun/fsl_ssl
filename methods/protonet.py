@@ -49,6 +49,10 @@ class ProtoNet(MetaTemplate):
             self.classifier_rotation.add_module('fc8',nn.Linear(128, 4))
 
 
+        # FOR DDP
+        
+        # model = (some model), plae fc7 classifier etc. in side that. Make that inherit MetaTemplate. Leave this as nn.Module            
+            
     def train_loop(self, epoch, train_loader, optimizer, writer, base_loader_u=None):
         print_freq = 10
         avg_loss=0
