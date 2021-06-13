@@ -8,6 +8,7 @@ import time
 import os
 import glob
 import random
+import datetime
 
 import backbone
 from data.datamgr import SimpleDataManager, SetDataManager
@@ -21,7 +22,7 @@ from io_utils import model_dict, parse_args, get_resume_file, get_best_file, get
 from tensorboardX import SummaryWriter
 import json
 from model_resnet import *
-
+from utils import RunningAverage
 
 import wandb
 
@@ -39,9 +40,21 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
     eval_interval = 20
     max_acc = 0       
     writer = SummaryWriter(log_dir=params.checkpoint_dir)
+
+    accum_epoch_time = RunningAverage()
+
     for epoch in range(start_epoch,stop_epoch):
+        start_time = time.time()
         model.train()
         model.train_loop(epoch, base_loader, optimizer, writer) # CHECKED 
+        end_time = time.time()
+        accum_epoch_time.update(end_time - start_time)
+        eta = str(datetime.timedelta(seconds = int(accum_epoch_time() * (stop_epoch - epoch))))
+        
+        print('Epoch %d complete; eta: %s' % (epoch, eta))
+        
+        wandb.log({"Epoch time": accum_epoch_time(), "Epoch": epoch})
+
         if epoch % eval_interval == True or epoch == stop_epoch - 1: 
             model.eval()
             if not os.path.isdir(params.checkpoint_dir):
