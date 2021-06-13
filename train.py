@@ -32,67 +32,7 @@ from torch.utils.data.distributed import DistributedSampler as DS
 
 
 def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):    
-    if params.optimization == 'Adam':
-        optimizer = torch.optim.Adam(model.parameters(), lr=params.lr)
-    elif params.optimization == 'SGD':
-        optimizer = torch.optim.SGD(model.parameters(), lr=params.lr)
-    elif params.optimization == 'Nesterov':
-        optimizer = torch.optim.SGD(model.parameters(), lr=params.lr, nesterov=True, momentum=0.9, weight_decay=params.wd)
-    else:
-       raise ValueError('Unknown optimization, please define by yourself')
-
-    eval_interval = 20
-    max_acc = 0       
-    writer = SummaryWriter(log_dir=params.checkpoint_dir)
-
-    accum_epoch_time = RunningAverage()
-
-    for epoch in range(start_epoch,stop_epoch):
-        start_time = time.time()
-        model.train()
-        model.train_loop(epoch, base_loader, optimizer, writer) # CHECKED 
-        end_time = time.time()
-        accum_epoch_time.update(end_time - start_time)
-        eta = str(datetime.timedelta(seconds = int(accum_epoch_time() * (stop_epoch - epoch))))
-        
-        print('Epoch %d complete; eta: %s' % (epoch, eta))
-        
-        wandb.log({"Epoch time": accum_epoch_time(), "Epoch": epoch}, step=model.global_count)
-
-        if epoch % eval_interval == True or epoch == stop_epoch - 1: 
-            model.eval()
-            if not os.path.isdir(params.checkpoint_dir):
-                os.makedirs(params.checkpoint_dir)
-
-            if params.jigsaw:
-                acc, acc_jigsaw = model.test_loop( val_loader)
-                wandb.log({"val/acc_jigsaw": acc_jigsaw}, step=model.global_count)
-#                 wandb.log({"val/loss_jigsaw": avg_loss_jigsaw}, step=model.global_count)
-            elif params.rotation:
-                acc, acc_rotation = model.test_loop( val_loader)
-                wandb.log({"val/acc_rotation": acc_rotation}, step=model.global_count)
-#                 wandb.log({"val/loss_rotation": avg_loss_rotation}, step=model.global_count)
-            else:    
-                acc = model.test_loop( val_loader)
-                
-#             wandb.log({"val/loss_avg": avg_loss}, step=model.global_count)
-#             wandb.log({"val/loss_proto": avg_loss_proto}, step=model.global_count)
-            wandb.log({"val/acc": acc}, step=model.global_count)
-            
-            if acc > max_acc : #for baseline and baseline++, we don't use validation here so we let acc = -1
-                print("best model! save...")
-                max_acc = acc
-                outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
-                torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
-                wandb.save(outfile)
-
-        if ((epoch+1) % params.save_freq==0) or (epoch==stop_epoch-1):
-#             outfile = os.path.join(params.checkpoint_dir, '{:d}.tar'.format(epoch))
-#             torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
-            
-            outfile_2 = os.path.join(params.checkpoint_dir, 'last_model.tar')
-            torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile_2)
-            wandb.save(outfile_2)
+    
 
     # only two models are uploaded in each run - the best one and the last one
     # return model
@@ -148,12 +88,12 @@ def main(gpu=None, params=None):
  
         train_few_shot_params    = dict(n_way = params.train_n_way, n_support = params.n_shot, \
                                         jigsaw=params.jigsaw, lbda=params.lbda, rotation=params.rotation) 
-        base_datamgr            = SetDataManager(image_size, n_query = n_query,  **train_few_shot_params, isAircraft=isAircraft)
+        base_datamgr            = SetDataManager(image_size, n_query = n_query,  **train_few_shot_params, isAircraft=isAircraft, parallel=params.parallel, rank=rank, world_size=params.world_size, sampler_seed=params.seed)
         base_loader             = base_datamgr.get_data_loader( base_file , aug = params.train_aug )
          
         test_few_shot_params     = dict(n_way = params.test_n_way, n_support = params.n_shot, \
                                         jigsaw=params.jigsaw, lbda=params.lbda, rotation=params.rotation) 
-        val_datamgr             = SetDataManager(image_size, n_query = n_query, **test_few_shot_params, isAircraft=isAircraft)
+        val_datamgr             = SetDataManager(image_size, n_query = n_query, **test_few_shot_params, isAircraft=isAircraft, parallel=params.parallel, rank=rank, world_size=params.world_size, sampler_seed=params.seed)
         val_loader              = val_datamgr.get_data_loader( val_file, aug = False) 
 
         if params.method == 'protonet':
@@ -179,9 +119,7 @@ def main(gpu=None, params=None):
 
     else:
        raise ValueError('Unknown method')
-    
-    # model = nn.DataParallel(model, device_ids = params.device_ids)
-    model = model.cuda()
+
 
     params.checkpoint_dir = 'ckpts/%s/%s_%s_%s' %(params.dataset, params.date, params.model, params.method)
     if params.train_aug:
@@ -225,7 +163,7 @@ def main(gpu=None, params=None):
         if resume_file is not None:
             tmp = torch.load(resume_file)
             start_epoch = tmp['epoch']+1
-            model.load_state_dict(tmp['state'])
+            model.model.load_state_dict(tmp['state'])
             del tmp
     elif params.warmup: #We also support warmup from pretrained baseline feature, but we never used in our paper
         baseline_checkpoint_dir = 'ckpts/%s/%s_%s' %(params.dataset, params.model, 'baseline')
@@ -242,7 +180,7 @@ def main(gpu=None, params=None):
                     state[newkey] = state.pop(key)
                 else:
                     state.pop(key)
-            model.feature.load_state_dict(state)
+            model.model.feature.load_state_dict(state)
         else:
             raise ValueError('No warm_up file')
     
@@ -252,8 +190,16 @@ def main(gpu=None, params=None):
         ## remove last layer for baseline
         pretrained_dict = {k: v for k, v in checkpoint['state'].items() if 'classifier' not in k and 'loss_fn' not in k}
         print('Load model from:',params.loadfile)
-        model.load_state_dict(pretrained_dict, strict=False)
+        model.model.load_state_dict(pretrained_dict, strict=False)
 
+    model.model = model.model.cuda(gpu)
+    
+    if params.parallel:
+        if params.gpus > 1:
+            model.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model.model)
+        model.model = nn.parallel.DistributedDataParallel(model.model, device_ids=[gpu], find_unused_parameters=True)
+    
+        
     json.dump(vars(params), open(params.checkpoint_dir+'/configs.json','w'))
     
     
@@ -265,11 +211,67 @@ def main(gpu=None, params=None):
     else:
         print('Fresh wandb run')
         wandb.init(config=vars(params), project="fsl_ssl")
+  
+    if params.optimization == 'Adam':
+        optimizer = torch.optim.Adam(model.model.parameters(), lr=params.lr)
+    elif params.optimization == 'SGD':
+        optimizer = torch.optim.SGD(model.model.parameters(), lr=params.lr)
+    elif params.optimization == 'Nesterov':
+        optimizer = torch.optim.SGD(model.model.parameters(), lr=params.lr, nesterov=True, momentum=0.9, weight_decay=params.wd)
+    else:
+       raise ValueError('Unknown optimization, please define by yourself')
 
-    
-    print("About to start training. Last model and best model will be saved in wandb at every model save. \n Run save_features.py and test.py after the training completes, with the same arguments")
-    
-    train(base_loader, val_loader,  model, start_epoch, stop_epoch, params)
+    eval_interval = 20
+    max_acc = 0       
+
+    accum_epoch_time = RunningAverage()
+
+    for epoch in range(start_epoch,stop_epoch):
+        start_time = time.time()
+        model.model.train()
+        model.train_loop(epoch, base_loader, optimizer, writer) # CHECKED 
+        end_time = time.time()
+        accum_epoch_time.update(end_time - start_time)
+        eta = str(datetime.timedelta(seconds = int(accum_epoch_time() * (stop_epoch - epoch))))
+        
+        print('Epoch %d complete; eta: %s' % (epoch, eta))
+        
+        wandb.log({"Epoch time": accum_epoch_time(), "Epoch": epoch}, step=model.global_count)
+
+        if epoch % eval_interval == True or epoch == stop_epoch - 1: 
+            model.eval()
+            if not os.path.isdir(params.checkpoint_dir):
+                os.makedirs(params.checkpoint_dir)
+
+            if params.jigsaw:
+                acc, acc_jigsaw = model.test_loop( val_loader)
+                wandb.log({"val/acc_jigsaw": acc_jigsaw}, step=model.global_count)
+#                 wandb.log({"val/loss_jigsaw": avg_loss_jigsaw}, step=model.global_count)
+            elif params.rotation:
+                acc, acc_rotation = model.test_loop( val_loader)
+                wandb.log({"val/acc_rotation": acc_rotation}, step=model.global_count)
+#                 wandb.log({"val/loss_rotation": avg_loss_rotation}, step=model.global_count)
+            else:    
+                acc = model.test_loop( val_loader)
+                
+#             wandb.log({"val/loss_avg": avg_loss}, step=model.global_count)
+#             wandb.log({"val/loss_proto": avg_loss_proto}, step=model.global_count)
+            wandb.log({"val/acc": acc}, step=model.global_count)
+            
+            if acc > max_acc : #for baseline and baseline++, we don't use validation here so we let acc = -1
+                print("best model! save...")
+                max_acc = acc
+                outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
+                torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
+                wandb.save(outfile)
+
+        if ((epoch+1) % params.save_freq==0) or (epoch==stop_epoch-1):
+#             outfile = os.path.join(params.checkpoint_dir, '{:d}.tar'.format(epoch))
+#             torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
+            
+            outfile_2 = os.path.join(params.checkpoint_dir, 'last_model.tar')
+            torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile_2)
+            wandb.save(outfile_2)
 
     
 
@@ -301,7 +303,7 @@ if __name__=='__main__':
         args.world_size = args.gpus * args.nodes
         mp.spawn(main, nprocs=args.gpus, args=(params,))
     else:
-        main(params=params)
+        main(gpu=0, params=params)
 
 #     ##### from save_features.py (except maml)#####
 #     split = 'novel'

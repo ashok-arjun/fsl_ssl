@@ -1,3 +1,8 @@
+# Store a model inside this. Any to() or train() or eval() calls should be changed to self.model.train etc. --> it will. We use the model only for forward passes?
+
+# Or override self.forward, self.train etc. to the inner model
+# DDP the inner self.model
+
 import backbone
 import utils
 
@@ -11,17 +16,16 @@ from resnet_pytorch import *
 
 import wandb
 
-class BaselineTrain(nn.Module):
-    def __init__(self, model_func, num_class, loss_type = 'softmax', jigsaw=False, lbda=0.0, rotation=False, tracking=True, pretrain=False):
-        super(BaselineTrain, self).__init__()
-        self.jigsaw = jigsaw
-        self.lbda = lbda
-        self.rotation = rotation
-        self.tracking = tracking
-        print('tracking in baseline train:',tracking)
-        self.pretrain = pretrain
-        print("USE pre-trained model:",pretrain)
 
+class BaselineTrainModel(nn.Module):
+    def __init__(self, model_func, loss_type, jigsaw, rotation):
+        super(BaselineTrainModel, self).__init__()
+        
+        self.model_func = model_func
+        self.loss_type = loss_type
+        self.jigsaw = jigsaw
+        self.rotation = rotation
+               
         if isinstance(model_func,str):
             if model_func == 'resnet18':
                 self.feature = ResidualNet('ImageNet', 18, 1000, None, tracking=self.tracking)
@@ -39,12 +43,8 @@ class BaselineTrain(nn.Module):
             self.classifier = nn.Linear(self.feature.final_feat_dim, num_class)
             self.classifier.bias.data.fill_(0)
         elif loss_type == 'dist': #Baseline ++
-            self.classifier = backbone.distLinear(self.feature.final_feat_dim, num_class)
-        self.loss_type = loss_type  #'softmax' #'dist'
-        self.num_class = num_class
-        self.loss_fn = nn.CrossEntropyLoss()
-        self.global_count = 0
-
+            self.classifier = backbone.distLinear(self.feature.final_feat_dim, num_class)        
+        
         if self.jigsaw:
             self.fc6 = nn.Sequential()
             self.fc6.add_module('fc6_s1',nn.Linear(512, 512))#for resnet
@@ -73,17 +73,51 @@ class BaselineTrain(nn.Module):
             self.classifier_rotation = nn.Sequential()
             self.classifier_rotation.add_module('fc8',nn.Linear(128, 4))
 
-    def forward(self,x):
-        x    = Variable(x.cuda())
+    def forward(self,x, feature=False, fc6=False, fc7=False, classifier_jigsaw=False, classifier_rotation=False):
+        if feature:
+            return self.feature(x)
+        elif fc6:
+            return self.fc6(x)
+        elif fc7:
+            return self.fc7(x)
+        elif classifier_jigsaw:
+            return self.classifier_jigsaw(x)
+        elif classifier_rotation:
+            return self.classifier_rotation(x)
+        
         out  = self.feature(x)
         scores  = self.classifier(out.view(x.size(0), -1))
         return scores
+    
+class BaselineTrain(nn.Module):
+    def __init__(self, model_func, num_class, loss_type = 'softmax', jigsaw=False, lbda=0.0, rotation=False, tracking=True, pretrain=False, gpu=0):
+        super(BaselineTrain, self).__init__()
+        self.jigsaw = jigsaw
+        self.lbda = lbda
+        self.rotation = rotation
+        self.tracking = tracking
+        print('Tracking in baseline train:',tracking)
+        self.pretrain = pretrain
+        print("Use pre-trained model:",pretrain)
+
+        self.loss_type = loss_type  #'softmax' #'dist'
+        self.num_class = num_class
+        self.loss_fn = nn.CrossEntropyLoss()
+        self.global_count = 0
+
+        self.model = BaselineTrainModel(model_func, loss_type, jigsaw, rotation)
+        
+        self.gpu = gpu       
+        
+        
+#     def forward(self,x, feature=False, fc6=False, fc7=False, classifier_jigsaw=False, classifier_rotation=False):
+#         return self.model.forward(x, feature, fc6, fc7, classifier_jigsaw, classifier_rotation)
 
     def forward_loss(self, x=None, y=None, patches=None, patches_label=None, unlabel_only=False, label_only=False):
         # import ipdb; ipdb.set_trace()
         if not unlabel_only:
-            scores = self.forward(x)
-            y = Variable(y.cuda())
+            scores = self.model(x)
+            y = Variable(y.cuda(self.gpu))
             pred = torch.argmax(scores, dim=1)
 
             if torch.cuda.is_available():
@@ -96,8 +130,8 @@ class BaselineTrain(nn.Module):
 
         if self.jigsaw:
             B,T,C,H,W = patches.size()#torch.Size([16, 9, 3, 64, 64])
-            patches = patches.view(B*T,C,H,W).cuda()#torch.Size([144, 3, 64, 64])
-            patch_feat = self.feature(patches)#torch.Size([144, 512, 1, 1])
+            patches = patches.view(B*T,C,H,W).cuda(self.gpu)#torch.Size([144, 3, 64, 64])
+            patch_feat = self.model(patches, feature=True)#torch.Size([144, 512, 1, 1])
 
             x_ = patch_feat.view(B,T,-1)#torch.Size([16, 9, 512])
             x_ = x_.transpose(0,1)#torch.Size([9, 16, 512])
@@ -109,10 +143,10 @@ class BaselineTrain(nn.Module):
                 x_list.append(z)
 
             x_ = torch.cat(x_list,1)#torch.Size([16, 9, 512])
-            x_ = self.fc7(x_.view(B,-1))#torch.Size([16, 9*512])
-            x_ = self.classifier_jigsaw(x_)
+            x_ = self.model(x_.view(B,-1), fc7=True)#torch.Size([16, 9*512])
+            x_ = self.model(x_, classifier_jigsaw=True)
 
-            y_ = patches_label.view(-1).cuda()
+            y_ = patches_label.view(-1).cuda(self.gpu)
 
             pred = torch.max(x_,1)
             acc_jigsaw = torch.sum(pred[1] == y_).cpu().numpy()*1.0/len(y_)
@@ -122,14 +156,14 @@ class BaselineTrain(nn.Module):
                 return self.loss_fn(scores, y), self.loss_fn(x_,y_), acc, acc_jigsaw
         elif self.rotation:
             B,R,C,H,W = patches.size()#torch.Size([16, 4, 3, 224, 224])
-            patches = patches.view(B*R,C,H,W).cuda()
-            x_ = self.feature(patches)#torch.Size([64, 512, 1, 1])
+            patches = patches.view(B*R,C,H,W).cuda(self.gpu)
+            x_ = self.model(patches, feature=True)#torch.Size([64, 512, 1, 1])
             x_ = x_.squeeze()
-            x_ = self.fc6(x_)
-            x_ = self.fc7(x_)#64,128
-            x_ = self.classifier_rotation(x_)#64,4
+            x_ = self.model(x_,fc6=True)
+            x_ = self.model(x_,fc7=True)#64,128
+            x_ = self.model(x_, classifier_rotation=True)#64,4
             pred = torch.max(x_,1)
-            y_ = patches_label.view(-1).cuda()
+            y_ = patches_label.view(-1).cuda(self.gpu)
             acc_jigsaw = torch.sum(pred[1] == y_).cpu().numpy()*1.0/len(y_)
             if unlabel_only:
                 return self.loss_fn(x_,y_), acc_jigsaw

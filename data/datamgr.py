@@ -209,7 +209,8 @@ class SetDataManager(DataManager):
         if not self.parallel:     
             data_loader_params = dict(batch_sampler = sampler,  num_workers = NUM_WORKERS, pin_memory = True) 
         else:
-            dist_sampler = DistributedSamplerWrapper(sampler, )
+            sampler = DistributedSamplerWrapper(sampler, num_replicas=self.world_size, rank=self.rank, shuffle=True, seed=self.sampler_seed)
+            data_loader_params = dict(batch_sampler = sampler,  num_workers = NUM_WORKERS, pin_memory = True)
         data_loader = torch.utils.data.DataLoader(dataset, **data_loader_params)
         return data_loader
 

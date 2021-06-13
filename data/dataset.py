@@ -16,6 +16,20 @@ from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import Dataset, Sampler
 
 
+# Below: just for safety, since DDP can be used. Should be removed later
+
+seed = 42
+random.seed(seed)
+np.random.seed(seed)
+torch.manual_seed(seed)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+os.environ["PYTHONHASHSEED"] = str(seed)
+
+
 def get_patches(img, transform_jigsaw, transform_patch_jigsaw, permutations):
     if np.random.rand() < 0.30:
         img = img.convert('LA').convert('RGB')## this should be L instead....... need to change that!!
@@ -275,10 +289,10 @@ class DistributedSamplerWrapper(DistributedSampler):
     def __init__(
         self,
         sampler,
-        seed,
         num_replicas: Optional[int] = None,
         rank: Optional[int] = None,
-        shuffle: bool = True
+        shuffle: bool = True,
+        seed: int = 0
     ):
         """
         Args:
@@ -292,10 +306,10 @@ class DistributedSamplerWrapper(DistributedSampler):
         """
         super(DistributedSamplerWrapper, self).__init__(
             DatasetFromSampler(sampler),
-            seed=seed,
             num_replicas=num_replicas,
             rank=rank,
             shuffle=shuffle,
+            seed=seed
         )
         self.sampler = sampler
 

@@ -5,12 +5,12 @@ from PIL import Image
 import numpy as np
 import torchvision.transforms as transforms
 import data.additional_transforms as add_transforms
-from data.dataset import SimpleDataset, SetDataset, EpisodicBatchSampler
+from data.dataset import SimpleDataset, SetDataset, EpisodicBatchSampler, DistributedSamplerWrapper
 from abc import abstractmethod
 
 import torch.multiprocessing as mp
 import torch.distributed as dist
-from torch.utils.data.distributed import DistributedSampler as DS
+from torch.utils.data.distributed import DistributedSampler
 
 
 NUM_WORKERS=8
@@ -126,7 +126,7 @@ class SimpleDataManager(DataManager):
         if not self.parallel:            
             data_loader_params = dict(batch_size = self.batch_size, shuffle = self.shuffle, num_workers = NUM_WORKERS, pin_memory = True, drop_last=self.drop_last)   
         else:
-            data_loader_params = dict(batch_size = self.batch_size, shuffle = False, num_workers = NUM_WORKERS, pin_memory = True, drop_last=self.drop_last, sampler = DS(dataset, num_replicas=self.world_size, rank=self.rank, shuffle=True, seed=self.seed))   
+            data_loader_params = dict(batch_size = self.batch_size, shuffle = False, num_workers = NUM_WORKERS, pin_memory = True, drop_last=self.drop_last, sampler = DistributedSampler(dataset, num_replicas=self.world_size, rank=self.rank, shuffle=True, seed=self.sampler_seed))   
         data_loader = torch.utils.data.DataLoader(dataset, **data_loader_params)
 
         return data_loader
@@ -141,7 +141,7 @@ class SimpleDataManager(DataManager):
 
 class SetDataManager(DataManager):
     def __init__(self, image_size, n_way, n_support, n_query, n_eposide =100, \
-                jigsaw=False, lbda=0.0, lbda_proto=0.0, rotation=False, isAircraft=False, grey=False):        
+                jigsaw=False, lbda=0.0, lbda_proto=0.0, rotation=False, isAircraft=False, grey=False, parallel=False, rank=None, world_size=None, sampler_seed=None):        
         super(SetDataManager, self).__init__()
         self.image_size = image_size
         self.n_way = n_way
@@ -157,6 +157,12 @@ class SetDataManager(DataManager):
         self.rotation = rotation
         self.isAircraft = isAircraft
         self.grey = grey
+        
+        
+        self.parallel = parallel
+        self.rank = rank
+        self.world_size = world_size
+        self.sampler_seed = sampler_seed
 
     def get_data_loader(self, data_file, aug): #parameters that would change on train/val set
         transform = self.trans_loader.get_composed_transform(aug)
@@ -199,7 +205,12 @@ class SetDataManager(DataManager):
                             transform_jigsaw=self.transform_jigsaw, transform_patch_jigsaw=self.transform_patch_jigsaw, \
                             rotation=self.rotation, isAircraft=self.isAircraft, grey=self.grey)
         sampler = EpisodicBatchSampler(len(dataset), self.n_way, self.n_eposide )  
-        data_loader_params = dict(batch_sampler = sampler,  num_workers = NUM_WORKERS, pin_memory = True)       
+        
+        if not self.parallel:     
+            data_loader_params = dict(batch_sampler = sampler,  num_workers = NUM_WORKERS, pin_memory = True) 
+        else:
+            sampler = DistributedSamplerWrapper(sampler, num_replicas=self.world_size, rank=self.rank, shuffle=True, seed=self.sampler_seed)
+            data_loader_params = dict(batch_sampler = sampler,  num_workers = NUM_WORKERS, pin_memory = True)
         data_loader = torch.utils.data.DataLoader(dataset, **data_loader_params)
         return data_loader
 
