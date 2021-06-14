@@ -133,7 +133,7 @@ class BaselineTrain(nn.Module):
 
             x_list = []
             for i in range(9):
-                z = self.fc6(x_[i])#torch.Size([16, 512])
+                z = self.model(x_[i], fc6=True)#torch.Size([16, 512])
                 z = z.view([B,1,-1])#torch.Size([16, 1, 512])
                 x_list.append(z)
 
