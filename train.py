@@ -231,9 +231,9 @@ def main(gpu=None, params=None):
             if params.method not in ['protonet']: # or any other episodic
                 base_loader.sampler.set_epoch(epoch)
                 val_loader.sampler.set_epoch(epoch)
-#             else:
-#                 base_loader.batch_sampler.set_epoch(epoch)
-#                 val_loader.batch_sampler.set_epoch(epoch)
+            else:
+                base_loader.batch_sampler.set_epoch(epoch)
+                val_loader.batch_sampler.set_epoch(epoch)
        
         # IMPORTANT: check whether same indicies are given for ptotonet
     
