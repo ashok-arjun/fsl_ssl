@@ -86,7 +86,7 @@ class BaselineTrainModel(nn.Module):
         scores  = self.classifier(out.view(x.size(0), -1))
         return scores
     
-class BaselineTrain(nn.Module):
+class BaselineTrain():
     def __init__(self, model_func, num_class, loss_type = 'softmax', jigsaw=False, lbda=0.0, rotation=False, tracking=True, pretrain=False, gpu=0):
         super(BaselineTrain, self).__init__()
         self.jigsaw = jigsaw
@@ -283,7 +283,7 @@ class BaselineTrain(nn.Module):
                 scheduler.step()
                 if not gpu: wandb.log({'train/lr': optimizer.param_groups[0]['lr']}, step=self.global_count)                
             
-            if (i+1) % print_freq==0:
+            if (i+1) % print_freq==0 and not gpu:
                 if self.jigsaw:
                     print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Cls {:f} | Loss Jigsaw {:f} | Acc Cls {:f} | Acc Jigsaw {:f}'.\
                         format(epoch, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_softmax/float(i+1), \

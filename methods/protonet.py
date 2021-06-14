@@ -167,7 +167,7 @@ class ProtoNet(MetaTemplate):
                 wandb.log({'train/acc_proto': acc}, step=self.global_count)
                 wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
 
-            if (i+1) % print_freq==0:
+            if (i+1) % print_freq==0 and not gpu:
                 #print(optimizer.state_dict()['param_groups'][0]['lr'])
                 if self.jigsaw:
                     print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Jigsaw {:f}'.\

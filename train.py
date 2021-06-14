@@ -195,12 +195,20 @@ def main(gpu=None, params=None):
     if params.parallel:
         if params.gpus > 1:
             model.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model.model)
-        model.model = nn.parallel.DistributedDataParallel(model.model, device_ids=[gpu], find_unused_parameters=True)
+        model.model = nn.parallel.DistributedDataParallel(model.model, device_ids=[gpu], find_unused_parameters=False)
     
     # Init WANDB
     if not params.parallel or params.parallel and gpu ==0: 
         json.dump(vars(params), open(params.checkpoint_dir+'/configs.json','w'))    
   
+        # Init WANDB
+        if params.resume_wandb_id:
+            print('Resuming from wandb ID: ', params.resume_wandb_id)
+            wandb.init(config=vars(params), project="fsl_ssl", id=params.resume_wandb_id, resume=True)
+        else:
+            print('Fresh wandb run')
+            wandb.init(config=vars(params), project="fsl_ssl")
+
     if params.optimization == 'Adam':
         optimizer = torch.optim.Adam(model.model.parameters(), lr=params.lr)
     elif params.optimization == 'SGD':
@@ -301,14 +309,6 @@ if __name__=='__main__':
         os.environ["CUDA_VISIBLE_DEVICES"] = params.devices
     
     print("params.parallel = ", params.parallel)    
-
-    # Init WANDB
-    if params.resume_wandb_id:
-        print('Resuming from wandb ID: ', params.resume_wandb_id)
-        wandb.init(config=vars(params), project="fsl_ssl", id=params.resume_wandb_id, resume=True)
-    else:
-        print('Fresh wandb run')
-        wandb.init(config=vars(params), project="fsl_ssl")
 
     if params.parallel:
         
