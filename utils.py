@@ -40,4 +40,4 @@ class RunningAverage():
     self.count += n_items
 
   def __call__(self):
-    return self.sum/self.count   
+    return self.sum/self.count if self.count else 0   
