@@ -88,7 +88,7 @@ class ProtoNet(MetaTemplate):
         plot_iter = len(train_loader) * params.eval_interval
         iter_num = start_epoch * len(train_loader) + (1 * start_epoch > 0) 
         max_acc = 0
-        print_freq = len(train_loader)/4
+        print_freq = len(train_loader) * (params.world_size * params.parallel)
 
         if not gpu: 
             print("Number of iterations per epoch: ", len(train_loader))
@@ -101,10 +101,6 @@ class ProtoNet(MetaTemplate):
 
         while iter_num < max_iter:
             self.model.train()
-            
-            if params.parallel and iter_num % len(train_loader) == 0 and iter_num > 0:
-                train_loader.batch_sampler.set_epoch(iter_num//len(train_loader)) # FOR BASELINE, USE SAMPLER
-                val_loader.batch_sampler.set_epoch(iter_num//len(train_loader))
 
             try:
                 inputs = iter_train_loader.next()
@@ -151,19 +147,19 @@ class ProtoNet(MetaTemplate):
                 wandb.log({'train/acc_proto': acc_proto}, step=iter_num)
                 wandb.log({'train/loss': float(loss.data.item())}, step=iter_num)
 
-                if (iter_num) % print_freq == 0:
+                if (iter_num + 1) % print_freq == 0:
                     
                     eta = str(datetime.timedelta(seconds = int(accumulated_iteration_time() * (max_iter - iter_num))))
 
                     if self.jigsaw:
-                        print('GPU {:d} | Iter {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Jigsaw {:f} | ETA: {:s}'.\
-                            format(gpu, iter_num, max_iter, avg_loss/float(iter_num+1), avg_loss_proto/float(iter_num+1), avg_loss_jigsaw/float(iter_num+1), eta))
+                        print('Iter {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Jigsaw {:f} | ETA: {:s}'.\
+                            format(iter_num, max_iter, avg_loss/float(iter_num+1), avg_loss_proto/float(iter_num+1), avg_loss_jigsaw/float(iter_num+1), eta))
                     elif self.rotation:
-                        print('GPU {:d} | Iter {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Rotation {:f} | ETA: {:s}'.\
-                            format(gpu, iter_num, max_iter, avg_loss/float(iter_num+1), avg_loss_proto/float(iter_num+1), avg_loss_rotation/float(iter_num+1), eta))
+                        print('Iter {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Rotation {:f} | ETA: {:s}'.\
+                            format(iter_num, max_iter, avg_loss/float(iter_num+1), avg_loss_proto/float(iter_num+1), avg_loss_rotation/float(iter_num+1), eta))
                     else:
-                        print('GPU {:d} | Iter {:d}/{:d} | Loss {:f} | ETA: {:s}'.\
-                            format(gpu, iter_num, max_iter, avg_loss/float(iter_num+1), eta))
+                        print('Iter {:d}/{:d} | Loss {:f} | ETA: {:s}'.\
+                            format(iter_num, max_iter, avg_loss/float(iter_num+1), eta))
 
                 if iter_num > 0 and ((iter_num + 1) % plot_iter == 0 or (iter_num + 1) == max_iter):
                     print("Evaluating...")

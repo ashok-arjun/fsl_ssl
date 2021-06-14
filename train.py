@@ -196,7 +196,7 @@ def main(gpu=None, params=None):
         if params.gpus > 1:
             model.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model.model)
         model.model = nn.parallel.DistributedDataParallel(model.model, device_ids=[gpu], find_unused_parameters=False)
-            
+
     # Init WANDB
     if not params.parallel or params.parallel and gpu ==0: 
         json.dump(vars(params), open(params.checkpoint_dir+'/configs.json','w'))    
@@ -233,7 +233,7 @@ def main(gpu=None, params=None):
     # ELSE EXECUTE PREVIOUS VERSION
 
 
-    # model.train_loop(base_loader, optimizer, start_epoch, stop_epoch, optimizer, val_loader=val_loader, params=params, gpu=gpu) # CHECKED 
+    model.train_loop(base_loader, optimizer, start_epoch, stop_epoch, optimizer, val_loader=val_loader, params=params, gpu=gpu) # CHECKED 
         
     # WARNING - ABOVE WORKS ONLY FOR PROTOTYPICAL NETWORKS
 

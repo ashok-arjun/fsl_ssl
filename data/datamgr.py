@@ -5,7 +5,7 @@ from PIL import Image
 import numpy as np
 import torchvision.transforms as transforms
 import data.additional_transforms as add_transforms
-from data.dataset import SimpleDataset, SetDataset, EpisodicBatchSampler, DistributedBatchSampler
+from data.dataset import SimpleDataset, SetDataset, EpisodicBatchSampler
 from abc import abstractmethod
 
 import torch.multiprocessing as mp
@@ -209,7 +209,7 @@ class SetDataManager(DataManager):
             sampler = EpisodicBatchSampler(len(dataset), self.n_way, self.n_eposide)  
             data_loader_params = dict(batch_sampler = sampler,  num_workers = NUM_WORKERS, pin_memory = True) 
         else:           
-            sampler = EpisodicBatchSampler(len(dataset), self.n_way, self.n_eposide / self.world_size)
+            sampler = EpisodicBatchSampler(len(dataset), self.n_way, self.n_eposide // self.world_size)
             data_loader_params = dict(batch_sampler = sampler, num_workers = NUM_WORKERS, pin_memory = True)
         data_loader = torch.utils.data.DataLoader(dataset, **data_loader_params)
         return data_loader
