@@ -9,7 +9,6 @@ import os
 import glob
 import random
 import datetime
-import dill
 
 import backbone
 from data.datamgr import SimpleDataManager, SetDataManager
@@ -246,7 +245,6 @@ def main(gpu=None, params=None):
         
         if not params.parallel or params.parallel and gpu ==0: 
             print('Epoch %d complete; eta: %s' % (epoch, eta))
-            wandb.log({"Epoch time": accum_epoch_time(), "Epoch": epoch}, step=model.global_count)
 
             if epoch % eval_interval == True or epoch == stop_epoch - 1: 
                 print("Evaluating...")
@@ -307,14 +305,15 @@ if __name__=='__main__':
         print("Commit the code and then execute with the --committed arg")
         exit()
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = params.devices
+    if params.devices:
+        os.environ["CUDA_VISIBLE_DEVICES"] = params.devices
     
     print("params.parallel = ", params.parallel)
     
     if params.parallel:
         
         print("params.gpus = ", params.gpus)
-        print("params.devices = ", params.devices)
+        if params.devices: print("params.devices = ", params.devices)
 
         os.environ['MASTER_ADDR'] = '127.0.0.1'
         os.environ['MASTER_PORT'] = '29534'

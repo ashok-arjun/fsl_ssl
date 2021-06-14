@@ -3,7 +3,6 @@ import utils
 
 import torch
 import torch.nn as nn
-import dill
 from torch.autograd import Variable
 import numpy as np
 import torch.nn.functional as F
