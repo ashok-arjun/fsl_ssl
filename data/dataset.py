@@ -347,10 +347,23 @@ class DistributedBatchSampler(BatchSampler):
     def __init__(self, batch_sampler, **kwargs):
         self.batch_sampler = batch_sampler
         self.kwargs = kwargs
+        self.epoch = 0
 
     def __iter__(self):
         for batch in self.batch_sampler:
-            yield list(DistributedSampler(batch, **self.kwargs))
+            distributed_sampler = DistributedSampler(batch, **self.kwargs)
+            distributed_sampler.set_epoch(self.epoch)
+            yield list(distributed_sampler)
+            
+    def set_epoch(self, epoch: int):
+        r"""
+        Sets the epoch for this sampler. When :attr:`shuffle=True`, this ensures all replicas
+        use a different random ordering for each epoch. Otherwise, the next iteration of this
+        sampler will yield the same ordering.
+        Args:
+            epoch (int): Epoch number.
+        """
+        self.epoch = epoch
 
     def __len__(self):
         return len(self.batch_sampler)
