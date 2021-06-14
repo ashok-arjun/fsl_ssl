@@ -86,7 +86,7 @@ class BaselineTrainModel(nn.Module):
         scores  = self.classifier(out.view(x.size(0), -1))
         return scores
     
-class BaselineTrain():
+class BaselineTrain(nn.Module):
     def __init__(self, model_func, num_class, loss_type = 'softmax', jigsaw=False, lbda=0.0, rotation=False, tracking=True, pretrain=False, gpu=0):
         super(BaselineTrain, self).__init__()
         self.jigsaw = jigsaw

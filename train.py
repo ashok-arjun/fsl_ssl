@@ -219,71 +219,14 @@ def main(gpu=None, params=None):
        raise ValueError('Unknown optimization, please define by yourself')
 
     eval_interval = params.eval_interval
-    max_acc = 0       
     
     if not params.parallel or params.parallel and gpu == 0: 
         print("Evaluation will be done every %d epochs\n\n" % (eval_interval))
-    accum_epoch_time = RunningAverage()
 
-    for epoch in range(start_epoch,stop_epoch):
-        if params.parallel:
-            if params.method not in ['protonet']: # or any other episodic
-                base_loader.sampler.set_epoch(epoch)
-                val_loader.sampler.set_epoch(epoch)
-            else:
-                base_loader.batch_sampler.set_epoch(epoch)
-                val_loader.batch_sampler.set_epoch(epoch)
-       
-        # IMPORTANT: check whether same indicies are given for ptotonet
-    
-        start_time = time.time()
-        model.model.train()
-        model.train_loop(epoch, base_loader, optimizer, gpu=gpu) # CHECKED 
-        end_time = time.time()
-        accum_epoch_time.update(end_time - start_time)
-        eta = str(datetime.timedelta(seconds = int(accum_epoch_time() * (stop_epoch - epoch))))
+    model.train_loop(base_loader, optimizer, start_epoch, stop_epoch, optimizer, val_loader=val_loader, params=params, gpu=gpu) # CHECKED 
         
-        if not params.parallel or params.parallel and gpu ==0: 
-            print('Epoch %d complete; eta: %s' % (epoch, eta))
+    # WARNING - ABOVE WORKS ONLY FOR PROTOTYPICAL NETWORKS
 
-            if epoch % eval_interval == True or epoch == stop_epoch - 1: 
-                print("Evaluating...")
-                model.model.eval()
-
-                if not os.path.isdir(params.checkpoint_dir):
-                    os.makedirs(params.checkpoint_dir)
-
-                if params.jigsaw:
-                    acc, acc_jigsaw = model.test_loop( val_loader)
-                    wandb.log({"val/acc_jigsaw": acc_jigsaw}, step=model.global_count)
-    #                 wandb.log({"val/loss_jigsaw": avg_loss_jigsaw}, step=model.global_count)
-                elif params.rotation:
-                    acc, acc_rotation = model.test_loop( val_loader)
-                    wandb.log({"val/acc_rotation": acc_rotation}, step=model.global_count)
-    #                 wandb.log({"val/loss_rotation": avg_loss_rotation}, step=model.global_count)
-                else:    
-                    acc = model.test_loop( val_loader)
-
-    #             wandb.log({"val/loss_avg": avg_loss}, step=model.global_count)
-    #             wandb.log({"val/loss_proto": avg_loss_proto}, step=model.global_count)
-                wandb.log({"val/acc": acc}, step=model.global_count)
-
-                if acc > max_acc : #for baseline and baseline++, we don't use validation here so we let acc = -1
-                    print("best model! save...")
-                    max_acc = acc
-                    outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
-                    torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
-                    wandb.save(outfile)
-
-            if ((epoch+1) % params.save_freq==0) or (epoch==stop_epoch-1):
-    #             outfile = os.path.join(params.checkpoint_dir, '{:d}.tar'.format(epoch))
-    #             torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
-
-                outfile_2 = os.path.join(params.checkpoint_dir, 'last_model.tar')
-                torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile_2)
-                wandb.save(outfile_2)
-
-    
 
 if __name__=='__main__':
        

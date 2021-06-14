@@ -5,12 +5,18 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import numpy as np
+import os
 import torch.nn.functional as F
 from methods.meta_template import MetaTemplate
 from model_resnet import *
 from itertools import cycle
 
+import time
+import datetime
+
 import wandb
+
+from utils import RunningAverage
 
 class ProtoNetModel(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, jigsaw=False, lbda=0.0, rotation=False, tracking=False, use_bn=True, pretrain=False):
@@ -71,90 +77,64 @@ class ProtoNet(MetaTemplate):
         self.global_count = 0
         self.model = ProtoNetModel(model_func,  n_way, n_support, jigsaw, lbda, rotation, tracking, use_bn, pretrain)
             
-    def train_loop(self, epoch, train_loader, optimizer, base_loader_u=None, gpu=0):
-        print_freq = 10
+    def train_loop(self, train_loader, optimizer, start_epoch, stop_epoch, base_loader_u=None, val_loader=None, params=None, gpu=0):
+        
         avg_loss=0
         avg_loss_proto=0
         avg_loss_jigsaw=0
         avg_loss_rotation=0
 
-        self.global_count = epoch * len(train_loader)
-        
-        # Uncomment the below and shift, add an else: when using unlabelled
-        
-#         if base_loader_u is not None:
+        max_iter = stop_epoch * len(train_loader)
+        plot_iter = len(train_loader) * params.eval_interval
+        iter_num = start_epoch * len(train_loader) + 1 
+        max_acc = 0
+        print_freq = len(train_loader)/4
 
-#             for i,inputs in enumerate(zip(train_loader,cycle(base_loader_u))):
-#                 self.global_count += 1
-#                 x = inputs[0][0]
-#                 self.n_query = x.size(1) - self.n_support
-#                 if self.change_way:
-#                     self.n_way  = x.size(0)
-#                 optimizer.zero_grad()
-#                 loss_proto, acc = self.set_forward_loss(x)
-#                 if self.jigsaw:
-#                     loss_jigsaw, acc_jigsaw = self.set_forward_loss_unlabel(inputs[1][2], inputs[1][3])# torch.Size([5, 21, 9, 3, 75, 75]), torch.Size([5, 21])
-#                     loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_jigsaw
-#                     wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
-#                     wandb.log({'train/loss_jigsaw': float(loss_jigsaw.data.item())}, step=self.global_count)
+        if not gpu: 
+            print("Number of iterations per epoch: ", len(train_loader))
+            print("Number of epochs: ", stop_epoch)
+            print('Total number of iterations: ', max_iter)
+            print('Starting training \n')
 
-#                 elif self.rotation:
-#                     loss_rotation, acc_rotation = self.set_forward_loss_unlabel(inputs[1][2], inputs[1][3])# torch.Size([5, 21, 9, 3, 75, 75]), torch.Size([5, 21])
-#                     loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_rotation
-#                     wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
-#                     wandb.log({'train/loss_rotation': float(loss_rotation.data.item())}, step=self.global_count)
+        accumulated_iteration_time = RunningAverage()
 
-#                 else:
-#                     loss = loss_proto
-#                 loss.backward()
-#                 optimizer.step()
-#                 avg_loss = avg_loss+loss.data
-#                 wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
+        while iter_num < max_iter:
+            self.model.train()
+            
+            if params.parallel and iter_num % len(train_loader) == 0 and iter_num > 0:
+                train_loader.batch_sampler.set_epoch(iter_num//len(train_loader)) # FOR BASELINE, USE SAMPLER
+                val_loader.batch_sampler.set_epoch(iter_num//len(train_loader))
 
-#                 if self.jigsaw:
-#                     avg_loss_proto += loss_proto.data
-#                     avg_loss_jigsaw += loss_jigsaw.data
-#                     wandb.log({'train/acc_proto': acc}, step=self.global_count)
-#                     wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
-#                 elif self.rotation:
-#                     avg_loss_proto += loss_proto.data
-#                     avg_loss_rotation += loss_rotation.data
-#                     wandb.log({'train/acc_proto': acc}, step=self.global_count)
-#                     wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
-#                 if (i+1) % print_freq==0:
-#                     if self.jigsaw:
-#                         print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Jigsaw {:f}'.\
-#                             format(epoch, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_proto/float(i+1), avg_loss_jigsaw/float(i+1)))
-#                     elif self.rotation:
-#                         print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Rotation {:f}'.\
-#                             format(epoch, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_proto/float(i+1), avg_loss_rotation/float(i+1)))
-#                     else:
-#                         print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i+1, len(train_loader), avg_loss/float(i+1)))
-#         else:
-        for i, inputs in enumerate(train_loader):
-            self.global_count += 1
+            try:
+                inputs = iter_train_loader.next()
+            except:
+                iter_train_loader = iter(train_loader)
+                inputs = iter_train_loader.next()
+
+            if not gpu: time_start = time.time()
+
             x = inputs[0]
             self.n_query = x.size(1) - self.n_support
             if self.change_way:
                 self.n_way  = x.size(0)
             optimizer.zero_grad()
-            loss_proto, acc = self.set_forward_loss(x)
+            loss_proto, acc_proto = self.set_forward_loss(x)
             if self.jigsaw:
                 loss_jigsaw, acc_jigsaw = self.set_forward_loss_unlabel(inputs[2], inputs[3])# torch.Size([5, 21, 9, 3, 75, 75]), torch.Size([5, 21])
                 loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_jigsaw
                 avg_loss_proto += loss_proto.data
                 avg_loss_jigsaw += loss_jigsaw.data
                 if not gpu:
-                    wandb.log({'train/loss_jigsaw': float(loss_jigsaw.data.item())}, step=self.global_count)
-                    wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
+                    wandb.log({'train/loss_jigsaw': float(loss_jigsaw.data.item())}, step=iter_num)
+                    wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=iter_num)
             elif self.rotation:
                 loss_rotation, acc_rotation = self.set_forward_loss_unlabel(inputs[2], inputs[3])# torch.Size([5, 21, 9, 3, 75, 75]), torch.Size([5, 21])
                 loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_rotation
                 avg_loss_proto += loss_proto.data
                 avg_loss_rotation += loss_rotation.data
                 if not gpu:
-                    wandb.log({'train/loss_rotation': float(loss_rotation.data.item())}, step=self.global_count)
-                    wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
+                    wandb.log({'train/loss_rotation': float(loss_rotation.data.item())}, step=iter_num)
+                    wandb.log({'train/acc_rotation': acc_rotation}, step=iter_num)
             else:
                 loss = loss_proto            
 
@@ -163,22 +143,64 @@ class ProtoNet(MetaTemplate):
             avg_loss = avg_loss+loss.item()
 
             if not gpu:
-                wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
-                wandb.log({'train/acc_proto': acc}, step=self.global_count)
-                wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
+                time_end = time.time()
+                accumulated_iteration_time.update(time_end - time_start)
+                
+                wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=iter_num)
+                wandb.log({'train/acc_proto': acc_proto}, step=iter_num)
+                wandb.log({'train/loss': float(loss.data.item())}, step=iter_num)
 
-            if (i+1) % print_freq==0 and not gpu:
-                #print(optimizer.state_dict()['param_groups'][0]['lr'])
+            if (iter_num) % print_freq==0 and not gpu:
+                
+                eta = str(datetime.timedelta(seconds = int(accumulated_iteration_time() * (max_iter - iter_num))))
+
                 if self.jigsaw:
-                    print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Jigsaw {:f}'.\
-                        format(epoch, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_proto/float(i+1), avg_loss_jigsaw/float(i+1)))
+                    print('Iter {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Jigsaw {:f} | ETA: {:s}'.\
+                        format(iter_num, max_iter, avg_loss/float(iter_num+1), avg_loss_proto/float(iter_num+1), avg_loss_jigsaw/float(iter_num+1), eta))
                 elif self.rotation:
-                    print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Rotation {:f}'.\
-                        format(epoch, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_proto/float(i+1), avg_loss_rotation/float(i+1)))
+                    print('Iter {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Rotation {:f} | ETA: {:s}'.\
+                        format(iter_num, max_iter, avg_loss/float(iter_num+1), avg_loss_proto/float(iter_num+1), avg_loss_rotation/float(iter_num+1), eta))
                 else:
-                    print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i+1, len(train_loader), avg_loss/float(i+1)))
+                    print('Iter {:d}/{:d} | Loss {:f} | ETA: {:s}'.format(iter_num, max_iter, avg_loss/float(iter_num+1), eta))
 
-                        
+
+
+            if gpu == 0 and iter_num % plot_iter == 0 or iter_num == max_iter-2:
+                print("Evaluating...")
+                self.model.eval()
+
+                if not os.path.isdir(params.checkpoint_dir):
+                    os.makedirs(params.checkpoint_dir)
+
+                if params.jigsaw:
+                    (acc, acc_mean_jigsaw), (avg_loss, avg_loss_proto, avg_loss_jigsaw) = self.test_loop_with_loss( val_loader)
+                    wandb.log({"val/acc_jigsaw": acc_jigsaw}, step=iter_num)
+                    wandb.log({"val/loss_jigsaw": avg_loss_jigsaw}, step=iter_num)
+                elif params.rotation:
+                    (acc, acc_mean_rotation), (avg_loss, avg_loss_proto, avg_loss_rotation) = self.test_loop_with_loss( val_loader)
+                    wandb.log({"val/acc_rotation": acc_rotation}, step=iter_num)
+                    wandb.log({"val/loss_rotation": avg_loss_rotation}, step=iter_num)
+                else:    
+                    (acc), (avg_loss, avg_loss_proto) = self.test_loop_with_loss( val_loader)
+
+                wandb.log({"val/loss_avg": avg_loss}, step=iter_num)
+                wandb.log({"val/loss_proto": avg_loss_proto}, step=iter_num)
+                wandb.log({"val/acc": acc}, step=iter_num)                 
+
+            if gpu == 0 and (iter_num + 1) % plot_iter == 0 or (iter_num + 1) == max_iter:
+                if acc > max_acc : #for baseline and baseline++, we don't use validation here so we let acc = -1
+                    print("best model! save...")
+                    max_acc = acc
+                    outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
+                    torch.save({'epoch':(iter_num + 1) % len(train_loader), 'state':self.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
+                    wandb.save(outfile) 
+
+                outfile_2 = os.path.join(params.checkpoint_dir, 'last_model.tar')
+                torch.save({'epoch':(iter_num + 1) % len(train_loader), 'state':self.state_dict(), 'optimizer': optimizer.state_dict()}, outfile_2)
+                wandb.save(outfile_2)
+
+            iter_num += 1       
+            
     def test_loop_with_loss(self, test_loader, record = None):
         correct =0
         count = 0
