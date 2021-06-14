@@ -55,7 +55,7 @@ def main(gpu=None, params=None):
     if params.method in ['baseline', 'baseline++'] :
         base_datamgr    = SimpleDataManager(image_size, batch_size = params.bs, jigsaw=params.jigsaw, rotation=params.rotation, isAircraft=isAircraft, parallel=params.parallel, rank=rank, world_size=params.world_size, sampler_seed=params.seed)
         base_loader     = base_datamgr.get_data_loader( base_file , aug = params.train_aug )
-        val_datamgr     = SimpleDataManager(image_size, batch_size = params.bs, jigsaw=params.jigsaw, rotation=params.rotation, isAircraft=isAircraft, parallel=params.parallel, rank=rank, world_size=params.world_size, sampler_seed=params.seed)
+        val_datamgr     = SimpleDataManager(image_size, batch_size = params.bs, jigsaw=params.jigsaw, rotation=params.rotation, isAircraft=isAircraft)
         val_loader      = val_datamgr.get_data_loader( val_file, aug = False)
 
         if params.dataset == 'CUB':
@@ -90,7 +90,7 @@ def main(gpu=None, params=None):
          
         test_few_shot_params     = dict(n_way = params.test_n_way, n_support = params.n_shot, \
                                         jigsaw=params.jigsaw, lbda=params.lbda, rotation=params.rotation) 
-        val_datamgr             = SetDataManager(image_size, n_query = n_query, **test_few_shot_params, isAircraft=isAircraft, parallel=params.parallel, rank=rank, world_size=params.world_size, sampler_seed=params.seed)
+        val_datamgr             = SetDataManager(image_size, n_query = n_query, **test_few_shot_params, isAircraft=isAircraft)
         val_loader              = val_datamgr.get_data_loader( val_file, aug = False) 
 
         if params.method == 'protonet':
