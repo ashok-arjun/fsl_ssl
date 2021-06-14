@@ -13,6 +13,7 @@ from itertools import cycle
 
 import time
 import datetime
+from tqdm import tqdm
 
 import wandb
 
@@ -85,19 +86,22 @@ class ProtoNet(MetaTemplate):
         avg_loss_rotation=0
 
         max_iter = stop_epoch * len(train_loader)
-        plot_iter = len(train_loader) * (params.world_size * params.parallel) * params.eval_interval
+        plot_iter = len(train_loader) * params.eval_interval
         iter_num = start_epoch * len(train_loader) + (1 * start_epoch > 0) 
         max_acc = 0
-        print_freq = len(train_loader) * (params.world_size * params.parallel)
+        print_freq = len(train_loader)
 
-        if not gpu: 
-            print("Number of iterations per epoch: ", len(train_loader))
-            print("Number of epochs: ", stop_epoch)
-            print('Total number of iterations: ', max_iter)
-            print("Plot Iter: ", plot_iter)
-            print('Starting training \n')
+        if params.parallel:
+            plot_iter *= params.parallel * params.world_size
+            print_freq *= params.parallel * params.world_size
 
-        accumulated_iteration_time = RunningAverage()
+        print("Number of iterations per epoch: ", len(train_loader))
+        print("Number of epochs: ", stop_epoch)
+        print('Total number of iterations: ', max_iter)
+        print("Plot Iter: ", plot_iter)
+        print('Starting training \n')
+
+        if not gpu: pbar = tqdm(total=max_iter)
 
         while iter_num < max_iter:
             self.model.train()
@@ -107,8 +111,6 @@ class ProtoNet(MetaTemplate):
             except:
                 iter_train_loader = iter(train_loader)
                 inputs = iter_train_loader.next()
-
-            if not gpu: time_start = time.time()
 
             x = inputs[0]
             self.n_query = x.size(1) - self.n_support
@@ -138,65 +140,51 @@ class ProtoNet(MetaTemplate):
             loss.backward()
             optimizer.step()
             avg_loss = avg_loss+loss.item()
-
-            if not gpu:
-                time_end = time.time()
-                accumulated_iteration_time.update(time_end - time_start)
                 
+            if not gpu:    
                 wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=iter_num)
                 wandb.log({'train/acc_proto': acc_proto}, step=iter_num)
                 wandb.log({'train/loss': float(loss.data.item())}, step=iter_num)
 
-                if (iter_num + 1) % print_freq == 0:
-                    
-                    eta = str(datetime.timedelta(seconds = int(accumulated_iteration_time() * (max_iter - iter_num))))
+            if not gpu: pbar.update(1)
 
-                    if self.jigsaw:
-                        print('Iter {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Jigsaw {:f} | ETA: {:s}'.\
-                            format(iter_num, max_iter, avg_loss/float(iter_num+1), avg_loss_proto/float(iter_num+1), avg_loss_jigsaw/float(iter_num+1), eta))
-                    elif self.rotation:
-                        print('Iter {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Rotation {:f} | ETA: {:s}'.\
-                            format(iter_num, max_iter, avg_loss/float(iter_num+1), avg_loss_proto/float(iter_num+1), avg_loss_rotation/float(iter_num+1), eta))
-                    else:
-                        print('Iter {:d}/{:d} | Loss {:f} | ETA: {:s}'.\
-                            format(iter_num, max_iter, avg_loss/float(iter_num+1), eta))
+            if iter_num > 0 and ((iter_num + 1) % plot_iter == 0 or (iter_num + 1) == max_iter) and not gpu:
+                self.model.eval()
 
-                if iter_num > 0 and ((iter_num + 1) % plot_iter == 0 or (iter_num + 1) == max_iter):
-                    # print("Evaluating...")
-                    # self.model.eval()
+                if not os.path.isdir(params.checkpoint_dir):
+                    os.makedirs(params.checkpoint_dir)
 
-                    # if not os.path.isdir(params.checkpoint_dir):
-                    #     os.makedirs(params.checkpoint_dir)
+                if params.jigsaw:
+                    acc, acc_jigsaw = self.test_loop( val_loader, gpu=gpu)
+                    wandb.log({"val/acc_jigsaw": acc_jigsaw}, step=iter_num)
+                    # wandb.log({"val/loss_jigsaw": avg_loss_jigsaw}, step=iter_num)
+                elif params.rotation:
+                    acc, acc_rotation = self.test_loop( val_loader, gpu=gpu)
+                    wandb.log({"val/acc_rotation": acc_rotation}, step=iter_num)
+                    # wandb.log({"val/loss_rotation": avg_loss_rotation}, step=iter_num)
+                else:   
+                    acc = self.test_loop( val_loader, gpu=gpu)
 
-                    # if params.jigsaw:
-                    #     acc, acc_jigsaw = self.test_loop( val_loader, gpu=gpu)
-                    #     wandb.log({"val/acc_jigsaw": acc_jigsaw}, step=iter_num)
-                    #     # wandb.log({"val/loss_jigsaw": avg_loss_jigsaw}, step=iter_num)
-                    # elif params.rotation:
-                    #     acc, acc_rotation = self.test_loop( val_loader, gpu=gpu)
-                    #     wandb.log({"val/acc_rotation": acc_rotation}, step=iter_num)
-                    #     # wandb.log({"val/loss_rotation": avg_loss_rotation}, step=iter_num)
-                    # else:   
-                    #     acc = self.test_loop( val_loader, gpu=gpu)
+                # wandb.log({"val/loss_avg": avg_loss}, step=iter_num)
+                # wandb.log({"val/loss_proto": avg_loss_proto}, step=iter_num)
+                wandb.log({"val/acc": acc}, step=iter_num)                 
 
-                    # # wandb.log({"val/loss_avg": avg_loss}, step=iter_num)
-                    # # wandb.log({"val/loss_proto": avg_loss_proto}, step=iter_num)
-                    # wandb.log({"val/acc": acc}, step=iter_num)                 
+                if acc > max_acc : #for baseline and baseline++, we don't use validation here so we let acc = -1
+                    # print("Best model! save...")
+                    max_acc = acc
+                    outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
+                    torch.save({'epoch':(iter_num + 1) % len(train_loader), 'state':self.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
+                    wandb.save(outfile) 
 
-                    # if acc > max_acc : #for baseline and baseline++, we don't use validation here so we let acc = -1
-                    #     print("best model! save...")
-                    #     max_acc = acc
-                    #     outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
-                    #     torch.save({'epoch':(iter_num + 1) % len(train_loader), 'state':self.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
-                    #     wandb.save(outfile) 
+                outfile_2 = os.path.join(params.checkpoint_dir, 'last_model.tar')
+                torch.save({'epoch':(iter_num + 1) / len(train_loader), 'state':self.model.state_dict() if not params.parallel else self.model.module.state_dict(), 'optimizer': optimizer.state_dict()}, outfile_2)
+                wandb.save(outfile_2)
 
-                    outfile_2 = os.path.join(params.checkpoint_dir, 'last_model.tar')
-                    torch.save({'epoch':(iter_num + 1) % len(train_loader), 'state':self.state_dict(), 'optimizer': optimizer.state_dict()}, outfile_2)
-                    wandb.save(outfile_2)
-                    print("Evaluated!")
-
-            iter_num += 1       
+            iter_num += 1   
+                
             
+        if not gpu: pbar.close()
+
     def test_loop_with_loss(self, test_loader, record = None):
         correct =0
         count = 0
