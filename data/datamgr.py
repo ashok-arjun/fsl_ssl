@@ -5,7 +5,7 @@ from PIL import Image
 import numpy as np
 import torchvision.transforms as transforms
 import data.additional_transforms as add_transforms
-from data.dataset import SimpleDataset, SetDataset, EpisodicBatchSampler, DistributedSamplerWrapper, DistributedBatchSampler
+from data.dataset import SimpleDataset, SetDataset, EpisodicBatchSampler, DistributedBatchSampler
 from abc import abstractmethod
 
 import torch.multiprocessing as mp
@@ -203,13 +203,13 @@ class SetDataManager(DataManager):
 
         dataset = SetDataset(data_file , self.batch_size, transform, jigsaw=self.jigsaw, \
                             transform_jigsaw=self.transform_jigsaw, transform_patch_jigsaw=self.transform_patch_jigsaw, \
-                            rotation=self.rotation, isAircraft=self.isAircraft, grey=self.grey)
-        sampler = EpisodicBatchSampler(len(dataset), self.n_way, self.n_eposide )  
+                            rotation=self.rotation, isAircraft=self.isAircraft, grey=self.grey)          
         
-        if not self.parallel:     
+        if not self.parallel:   
+            sampler = EpisodicBatchSampler(len(dataset), self.n_way, self.n_eposide)  
             data_loader_params = dict(batch_sampler = sampler,  num_workers = NUM_WORKERS, pin_memory = True) 
         else:           
-            sampler = DistributedBatchSampler(sampler, num_replicas=self.world_size, rank=self.rank, shuffle=True, seed=self.sampler_seed)
+            sampler = EpisodicBatchSampler(len(dataset), self.n_way, self.n_eposide / self.world_size)
             data_loader_params = dict(batch_sampler = sampler, num_workers = NUM_WORKERS, pin_memory = True)
         data_loader = torch.utils.data.DataLoader(dataset, **data_loader_params)
         return data_loader
