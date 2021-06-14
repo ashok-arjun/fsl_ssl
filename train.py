@@ -30,6 +30,7 @@ import torch.multiprocessing as mp
 import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler as DS
 
+torch.autograd.set_detect_anomaly(True)
 
 def main(gpu=None, params=None):
     
@@ -196,18 +197,9 @@ def main(gpu=None, params=None):
             model.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model.model)
         model.model = nn.parallel.DistributedDataParallel(model.model, device_ids=[gpu], find_unused_parameters=True)
     
-        
-    json.dump(vars(params), open(params.checkpoint_dir+'/configs.json','w'))
-    
-    
     # Init WANDB
-    
-    if params.resume_wandb_id:
-        print('Resuming from wandb ID: ', params.resume_wandb_id)
-        wandb.init(config=vars(params), project="fsl_ssl", id=params.resume_wandb_id, resume=True)
-    else:
-        print('Fresh wandb run')
-        wandb.init(config=vars(params), project="fsl_ssl")
+    if not params.parallel or params.parallel and gpu ==0: 
+        json.dump(vars(params), open(params.checkpoint_dir+'/configs.json','w'))    
   
     if params.optimization == 'Adam':
         optimizer = torch.optim.Adam(model.model.parameters(), lr=params.lr)
@@ -221,7 +213,7 @@ def main(gpu=None, params=None):
     eval_interval = params.eval_interval
     max_acc = 0       
     
-    if not params.parallel or params.parallel and gpu ==0: 
+    if not params.parallel or params.parallel and gpu == 0: 
         print("Evaluation will be done every %d epochs\n\n" % (eval_interval))
     accum_epoch_time = RunningAverage()
 
@@ -238,7 +230,7 @@ def main(gpu=None, params=None):
     
         start_time = time.time()
         model.model.train()
-        model.train_loop(epoch, base_loader, optimizer) # CHECKED 
+        model.train_loop(epoch, base_loader, optimizer, gpu=gpu) # CHECKED 
         end_time = time.time()
         accum_epoch_time.update(end_time - start_time)
         eta = str(datetime.timedelta(seconds = int(accum_epoch_time() * (stop_epoch - epoch))))
@@ -308,8 +300,16 @@ if __name__=='__main__':
     if params.devices:
         os.environ["CUDA_VISIBLE_DEVICES"] = params.devices
     
-    print("params.parallel = ", params.parallel)
-    
+    print("params.parallel = ", params.parallel)    
+
+    # Init WANDB
+    if params.resume_wandb_id:
+        print('Resuming from wandb ID: ', params.resume_wandb_id)
+        wandb.init(config=vars(params), project="fsl_ssl", id=params.resume_wandb_id, resume=True)
+    else:
+        print('Fresh wandb run')
+        wandb.init(config=vars(params), project="fsl_ssl")
+
     if params.parallel:
         
         print("params.gpus = ", params.gpus)

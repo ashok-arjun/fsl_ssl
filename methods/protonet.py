@@ -25,12 +25,12 @@ class ProtoNetModel(MetaTemplate):
         if self.jigsaw:
             self.fc6 = nn.Sequential()
             self.fc6.add_module('fc6_s1',nn.Linear(512, 512))#for resnet
-            self.fc6.add_module('relu6_s1',nn.ReLU(inplace=True))
+            self.fc6.add_module('relu6_s1',nn.ReLU(inplace=False))
             self.fc6.add_module('drop6_s1',nn.Dropout(p=0.5))
 
             self.fc7 = nn.Sequential()
             self.fc7.add_module('fc7',nn.Linear(9*512,4096))#for resnet
-            self.fc7.add_module('relu7',nn.ReLU(inplace=True))
+            self.fc7.add_module('relu7',nn.ReLU(inplace=False))
             self.fc7.add_module('drop7',nn.Dropout(p=0.5))
 
             self.classifier = nn.Sequential()
@@ -38,22 +38,26 @@ class ProtoNetModel(MetaTemplate):
         if self.rotation:
             self.fc6 = nn.Sequential()
             self.fc6.add_module('fc6_s1',nn.Linear(512, 512))#for resnet
-            self.fc6.add_module('relu6_s1',nn.ReLU(inplace=True))
+            self.fc6.add_module('relu6_s1',nn.ReLU(inplace=False))
             self.fc6.add_module('drop6_s1',nn.Dropout(p=0.5))
 
             self.fc7 = nn.Sequential()
             self.fc7.add_module('fc7',nn.Linear(512,128))#for resnet
-            self.fc7.add_module('relu7',nn.ReLU(inplace=True))
+            self.fc7.add_module('relu7',nn.ReLU(inplace=False))
             self.fc7.add_module('drop7',nn.Dropout(p=0.5))
 
             self.classifier_rotation = nn.Sequential()
             self.classifier_rotation.add_module('fc8',nn.Linear(128, 4))
     
-    def forward(self,x, fc6=False, fc7=False):
+    def forward(self,x, fc6=False, fc7=False, classifier=False, classifier_rotation=False):
         if fc6:
             return self.fc6(x)
         elif fc7:
             return self.fc7(x)
+        elif classifier:
+            return self.classifier(x)
+        elif classifier_rotation:
+            return self.classifier_rotation(x)
 
         return self.feature(x)
 class ProtoNet(MetaTemplate):
@@ -67,7 +71,7 @@ class ProtoNet(MetaTemplate):
         self.global_count = 0
         self.model = ProtoNetModel(model_func,  n_way, n_support, jigsaw, lbda, rotation, tracking, use_bn, pretrain)
             
-    def train_loop(self, epoch, train_loader, optimizer, base_loader_u=None):
+    def train_loop(self, epoch, train_loader, optimizer, base_loader_u=None, gpu=0):
         print_freq = 10
         avg_loss=0
         avg_loss_proto=0
@@ -138,32 +142,30 @@ class ProtoNet(MetaTemplate):
             if self.jigsaw:
                 loss_jigsaw, acc_jigsaw = self.set_forward_loss_unlabel(inputs[2], inputs[3])# torch.Size([5, 21, 9, 3, 75, 75]), torch.Size([5, 21])
                 loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_jigsaw
-                wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
-                wandb.log({'train/loss_jigsaw': float(loss_jigsaw.data.item())}, step=self.global_count)
-
                 avg_loss_proto += loss_proto.data
                 avg_loss_jigsaw += loss_jigsaw.data
-                wandb.log({'train/acc_proto': acc}, step=self.global_count)
-                wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
+                if not gpu:
+                    wandb.log({'train/loss_jigsaw': float(loss_jigsaw.data.item())}, step=self.global_count)
+                    wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
             elif self.rotation:
                 loss_rotation, acc_rotation = self.set_forward_loss_unlabel(inputs[2], inputs[3])# torch.Size([5, 21, 9, 3, 75, 75]), torch.Size([5, 21])
                 loss = (1.0-self.lbda) * loss_proto + self.lbda * loss_rotation
-                wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
-                wandb.log({'train/loss_rotation': float(loss_rotation.data.item())}, step=self.global_count)
-
                 avg_loss_proto += loss_proto.data
                 avg_loss_rotation += loss_rotation.data
-                wandb.log({'train/acc_proto': acc}, step=self.global_count)
-                wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
+                if not gpu:
+                    wandb.log({'train/loss_rotation': float(loss_rotation.data.item())}, step=self.global_count)
+                    wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
             else:
-                loss = loss_proto
-                wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
-                wandb.log({'train/acc_proto': acc}, step=self.global_count)
+                loss = loss_proto            
 
             loss.backward()
             optimizer.step()
             avg_loss = avg_loss+loss.item()
-            wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
+
+            if not gpu:
+                wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
+                wandb.log({'train/acc_proto': acc}, step=self.global_count)
+                wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
 
             if (i+1) % print_freq==0:
                 #print(optimizer.state_dict()['param_groups'][0]['lr'])
@@ -376,7 +378,7 @@ class ProtoNet(MetaTemplate):
 
             x_ = torch.cat(x_list,1)#torch.Size([75, 9, 512])
             x_ = self.model.forward(x_.view(B,-1), fc7=True)#torch.Size([75, 9*512])
-            x_ = self.model.classifier(x_)
+            x_ = self.model.forward(x_, classifier=True)
 
             y_ = patches_label.view(-1).cuda()
 
@@ -387,7 +389,7 @@ class ProtoNet(MetaTemplate):
             x_ = x_.squeeze()
             x_ = self.model.forward(x_, fc6=True)
             x_ = self.model.forward(x_, fc7=True)#64,128
-            x_ = self.model.classifier_rotation(x_)#64,4
+            x_ = self.model.forward(x_, classifier_rotation=True)#64,4
             pred = torch.max(x_,1)
             y_ = patches_label.view(-1).cuda()
             return x_, y_

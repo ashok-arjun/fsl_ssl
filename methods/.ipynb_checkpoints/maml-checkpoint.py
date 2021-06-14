@@ -29,13 +29,13 @@ class MAML(MetaTemplate):
         if self.jigsaw:
             self.fc6 = nn.Sequential()
             self.fc6.add_module('fc6_s1',backbone.Linear_fw(512, 512))#for resnet
-            self.fc6.add_module('relu6_s1',nn.ReLU(inplace=True))
+            self.fc6.add_module('relu6_s1',nn.ReLU(inplace=False))
             self.fc6.add_module('drop6_s1',nn.Dropout(p=0.5))
             self.fc6[0].bias.data.fill_(0)
 
             self.fc7 = nn.Sequential()
             self.fc7.add_module('fc7',backbone.Linear_fw(9*512,4096))#for resnet
-            self.fc7.add_module('relu7',nn.ReLU(inplace=True))
+            self.fc7.add_module('relu7',nn.ReLU(inplace=False))
             self.fc7.add_module('drop7',nn.Dropout(p=0.5))
             self.fc7[0].bias.data.fill_(0)
 
@@ -45,13 +45,13 @@ class MAML(MetaTemplate):
         if self.rotation:
             self.fc6 = nn.Sequential()
             self.fc6.add_module('fc6_s1',backbone.Linear_fw(512, 512))#for resnet
-            self.fc6.add_module('relu6_s1',nn.ReLU(inplace=True))
+            self.fc6.add_module('relu6_s1',nn.ReLU(inplace=False))
             self.fc6.add_module('drop6_s1',nn.Dropout(p=0.5))
             self.fc6[0].bias.data.fill_(0)
 
             self.fc7 = nn.Sequential()
             self.fc7.add_module('fc7',backbone.Linear_fw(512,128))#for resnet
-            self.fc7.add_module('relu7',nn.ReLU(inplace=True))
+            self.fc7.add_module('relu7',nn.ReLU(inplace=False))
             self.fc7.add_module('drop7',nn.Dropout(p=0.5))
             self.fc7[0].bias.data.fill_(0)
 

@@ -21,12 +21,12 @@ class ProtoNet(MetaTemplate):
         if self.jigsaw:
             self.fc6 = nn.Sequential()
             self.fc6.add_module('fc6_s1',nn.Linear(512, 512))#for resnet
-            self.fc6.add_module('relu6_s1',nn.ReLU(inplace=True))
+            self.fc6.add_module('relu6_s1',nn.ReLU(inplace=False))
             self.fc6.add_module('drop6_s1',nn.Dropout(p=0.5))
 
             self.fc7 = nn.Sequential()
             self.fc7.add_module('fc7',nn.Linear(9*512,4096))#for resnet
-            self.fc7.add_module('relu7',nn.ReLU(inplace=True))
+            self.fc7.add_module('relu7',nn.ReLU(inplace=False))
             self.fc7.add_module('drop7',nn.Dropout(p=0.5))
 
             self.classifier = nn.Sequential()
@@ -34,12 +34,12 @@ class ProtoNet(MetaTemplate):
         if self.rotation:
             self.fc6 = nn.Sequential()
             self.fc6.add_module('fc6_s1',nn.Linear(512, 512))#for resnet
-            self.fc6.add_module('relu6_s1',nn.ReLU(inplace=True))
+            self.fc6.add_module('relu6_s1',nn.ReLU(inplace=False))
             self.fc6.add_module('drop6_s1',nn.Dropout(p=0.5))
 
             self.fc7 = nn.Sequential()
             self.fc7.add_module('fc7',nn.Linear(512,128))#for resnet
-            self.fc7.add_module('relu7',nn.ReLU(inplace=True))
+            self.fc7.add_module('relu7',nn.ReLU(inplace=False))
             self.fc7.add_module('drop7',nn.Dropout(p=0.5))
 
             self.classifier_rotation = nn.Sequential()

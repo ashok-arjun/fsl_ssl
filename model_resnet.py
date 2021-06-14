@@ -84,7 +84,7 @@ class BasicBlock(nn.Module):
                 self.bn1 = BatchNorm2d_fw(planes)
             else:
                 self.bn1 = nn.BatchNorm2d(planes, track_running_stats=track_running_stats)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
         if self.maml:
             self.conv2 = conv3x3_fw(planes, planes)
         else:
@@ -156,7 +156,7 @@ class Bottleneck(nn.Module):
                 self.bn3 = BatchNorm2d_fw(planes * 4)
             else:
                 self.bn3 = nn.BatchNorm2d(planes * 4, track_running_stats=track_running_stats)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
         self.downsample = downsample
         self.stride = stride
 
@@ -226,7 +226,7 @@ class ResNet(nn.Module):
                 self.bn1 = BatchNorm2d_fw(64)
             else:
                 self.bn1 = nn.BatchNorm2d(64, track_running_stats=self.track_running_stats)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
 
         self.layer1 = self._make_layer(block, 64,  layers[0], att_type=att_type, use_bn=self.use_bn)
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2, att_type=att_type, use_bn=self.use_bn)

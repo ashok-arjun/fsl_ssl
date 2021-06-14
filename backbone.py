@@ -110,7 +110,7 @@ class ConvBlock(nn.Module):
         else:
             self.C      = nn.Conv2d(indim, outdim, 3, padding= padding)
             self.BN     = nn.BatchNorm2d(outdim)
-        self.relu   = nn.ReLU(inplace=True)
+        self.relu   = nn.ReLU(inplace=False)
 
         self.parametrized_layers = [self.C, self.BN, self.relu]
         if pool:
@@ -144,8 +144,8 @@ class SimpleBlock(nn.Module):
             self.BN1 = nn.BatchNorm2d(outdim)
             self.C2 = nn.Conv2d(outdim, outdim,kernel_size=3, padding=1,bias=False)
             self.BN2 = nn.BatchNorm2d(outdim)
-        self.relu1 = nn.ReLU(inplace=True)
-        self.relu2 = nn.ReLU(inplace=True)
+        self.relu1 = nn.ReLU(inplace=False)
+        self.relu2 = nn.ReLU(inplace=False)
 
         self.parametrized_layers = [self.C1, self.C2, self.BN1, self.BN2]
 

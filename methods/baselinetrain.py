@@ -45,12 +45,12 @@ class BaselineTrainModel(nn.Module):
         if self.jigsaw:
             self.fc6 = nn.Sequential()
             self.fc6.add_module('fc6_s1',nn.Linear(512, 512))#for resnet
-            self.fc6.add_module('relu6_s1',nn.ReLU(inplace=True))
+            self.fc6.add_module('relu6_s1',nn.ReLU(inplace=False))
             self.fc6.add_module('drop6_s1',nn.Dropout(p=0.5))
 
             self.fc7 = nn.Sequential()
             self.fc7.add_module('fc7',nn.Linear(9*512,4096))#for resnet
-            self.fc7.add_module('relu7',nn.ReLU(inplace=True))
+            self.fc7.add_module('relu7',nn.ReLU(inplace=False))
             self.fc7.add_module('drop7',nn.Dropout(p=0.5))
 
             self.classifier_jigsaw = nn.Sequential()
@@ -59,12 +59,12 @@ class BaselineTrainModel(nn.Module):
         if self.rotation:
             self.fc6 = nn.Sequential()
             self.fc6.add_module('fc6_s1',nn.Linear(512, 512))#for resnet
-            self.fc6.add_module('relu6_s1',nn.ReLU(inplace=True))
+            self.fc6.add_module('relu6_s1',nn.ReLU(inplace=False))
             self.fc6.add_module('drop6_s1',nn.Dropout(p=0.5))
 
             self.fc7 = nn.Sequential()
             self.fc7.add_module('fc7',nn.Linear(512,128))#for resnet
-            self.fc7.add_module('relu7',nn.ReLU(inplace=True))
+            self.fc7.add_module('relu7',nn.ReLU(inplace=False))
             self.fc7.add_module('drop7',nn.Dropout(p=0.5))
 
             self.classifier_rotation = nn.Sequential()
@@ -167,7 +167,7 @@ class BaselineTrain(nn.Module):
         else:
             return self.loss_fn(scores, y), acc
     
-    def train_loop(self, epoch, train_loader, optimizer, scheduler=None, base_loader_u=None):
+    def train_loop(self, epoch, train_loader, optimizer, scheduler=None, base_loader_u=None, gpu=None):
         print_freq = min(50,len(train_loader))
         avg_loss=0
         avg_loss_softmax=0
@@ -246,41 +246,42 @@ class BaselineTrain(nn.Module):
             if self.jigsaw:
                 loss_softmax, loss_jigsaw, acc, acc_jigsaw = self.forward_loss(x, y, inputs[2], inputs[3])
                 loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_jigsaw
-                wandb.log({'train/loss_softmax': float(loss_softmax.data.item())}, step=self.global_count)
-                wandb.log({'train/loss_jigsaw': float(loss_jigsaw.data.item())}, step=self.global_count)
+                
 
                 avg_loss_softmax += loss_softmax.data
                 avg_loss_jigsaw += loss_jigsaw
                 avg_acc_jigsaw = avg_acc_jigsaw+acc_jigsaw
-                wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
-                wandb.log({'train/acc_softmax': acc}, step=self.global_count)
+                if not gpu:
+                    wandb.log({'train/loss_jigsaw': float(loss_jigsaw.data.item())}, step=self.global_count)
+                    wandb.log({'train/acc_jigsaw': acc_jigsaw}, step=self.global_count)
 
             elif self.rotation:
                 loss_softmax, loss_rotation, acc, acc_rotation = self.forward_loss(x, y, inputs[2], inputs[3])
                 loss = (1.0-self.lbda) * loss_softmax + self.lbda * loss_rotation
-                wandb.log({'train/loss_softmax': float(loss_softmax.data.item())}, step=self.global_count)
-                wandb.log({'train/loss_rotation': float(loss_rotation.data.item())}, step=self.global_count)
-
-
                 avg_loss_softmax += loss_softmax.data
                 avg_loss_rotation += loss_rotation
-                avg_acc_rotation = avg_acc_rotation+acc_rotation
-                wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
-                wandb.log({'train/acc_softmax': acc}, step=self.global_count)
+                avg_acc_rotation = avg_acc_rotation+acc_rotation                
+
+                if not gpu:
+                    wandb.log({'train/loss_rotation': float(loss_rotation.data.item())}, step=self.global_count)
+                    wandb.log({'train/acc_rotation': acc_rotation}, step=self.global_count)
             else:
-                loss, acc = self.forward_loss(x,y)
-                wandb.log({'train/loss_softmax': float(loss.data.item())}, step=self.global_count)
-                wandb.log({'train/acc_softmax': acc}, step=self.global_count)
+                loss, acc = self.forward_loss(x,y)            
 
             avg_loss = avg_loss+loss.data
-            avg_acc_softmax = avg_acc_softmax+acc                
-            wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
+            avg_acc_softmax = avg_acc_softmax+acc             
+            
             loss.backward()
             optimizer.step()
 
+            if not gpu:
+                wandb.log({'train/loss_softmax': float(loss.data.item())}, step=self.global_count)
+                wandb.log({'train/acc_softmax': acc}, step=self.global_count)
+                wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
+
             if scheduler is not None:
                 scheduler.step()
-                wandb.log({'train/lr': optimizer.param_groups[0]['lr']}, step=self.global_count)                
+                if not gpu: wandb.log({'train/lr': optimizer.param_groups[0]['lr']}, step=self.global_count)                
             
             if (i+1) % print_freq==0:
                 if self.jigsaw:
