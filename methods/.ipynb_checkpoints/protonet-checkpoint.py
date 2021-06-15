@@ -49,8 +49,8 @@ class ProtoNet(MetaTemplate):
             self.classifier_rotation.add_module('fc8',nn.Linear(128, 4))
 
 
-    def train_loop(self, epoch, train_loader, optimizer, writer, base_loader_u=None):
-        print_freq = 10
+    def train_loop(self, epoch, train_loader, optimizer, base_loader_u=None, pbar=None):
+        print_freq = len(train_loader)
         avg_loss=0
         avg_loss_proto=0
         avg_loss_jigsaw=0
@@ -146,17 +146,19 @@ class ProtoNet(MetaTemplate):
             optimizer.step()
             avg_loss = avg_loss+loss.item()
             wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
-
+           
+            pbar.update(1)
+        
             if (i+1) % print_freq==0:
                 #print(optimizer.state_dict()['param_groups'][0]['lr'])
                 if self.jigsaw:
-                    print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Jigsaw {:f}'.\
+                    pbar.write('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Jigsaw {:f}'.\
                         format(epoch, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_proto/float(i+1), avg_loss_jigsaw/float(i+1)))
                 elif self.rotation:
-                    print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Rotation {:f}'.\
+                    pbar.write('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Rotation {:f}'.\
                         format(epoch, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_proto/float(i+1), avg_loss_rotation/float(i+1)))
                 else:
-                    print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i+1, len(train_loader), avg_loss/float(i+1)))
+                    pbar.write('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i+1, len(train_loader), avg_loss/float(i+1)))
 
                         
     def test_loop_with_loss(self, test_loader, record = None):

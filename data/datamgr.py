@@ -7,8 +7,30 @@ import torchvision.transforms as transforms
 import data.additional_transforms as add_transforms
 from data.dataset import SimpleDataset, SetDataset, EpisodicBatchSampler
 from abc import abstractmethod
+import random
+import os
+
 
 NUM_WORKERS=8
+
+"""JUST SETTING SEED"""
+
+from io_utils import parse_args
+
+params = parse_args('train')
+
+seed = params.seed
+random.seed(seed)
+np.random.seed(seed)
+torch.manual_seed(seed)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+os.environ["PYTHONHASHSEED"] = str(seed)
+
+"""DONE"""
 
 class TransformLoader:
     def __init__(self, image_size, 

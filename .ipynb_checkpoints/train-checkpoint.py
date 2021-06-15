@@ -9,6 +9,7 @@ import os
 import glob
 import random
 import datetime
+from tqdm import tqdm
 
 import backbone
 from data.datamgr import SimpleDataManager, SetDataManager
@@ -37,23 +38,22 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
     else:
        raise ValueError('Unknown optimization, please define by yourself')
 
-    eval_interval = 20
+    eval_interval = params.eval_interval
     max_acc = 0       
-    writer = SummaryWriter(log_dir=params.checkpoint_dir)
 
     accum_epoch_time = RunningAverage()
 
+    pbar = tqdm(range(0, stop_epoch*len(base_loader)), total = stop_epoch*len(base_loader))
+    
     for epoch in range(start_epoch,stop_epoch):
         start_time = time.time()
         model.train()
-        model.train_loop(epoch, base_loader, optimizer, writer) # CHECKED 
+        model.train_loop(epoch, base_loader, optimizer, pbar=pbar) # CHECKED 
         end_time = time.time()
         accum_epoch_time.update(end_time - start_time)
-        eta = str(datetime.timedelta(seconds = int(accum_epoch_time() * (stop_epoch - epoch))))
+        eta = str(datetime.timedelta(seconds = int(accum_epoch_time() * (stop_epoch - epoch))))        
         
-        print('Epoch %d complete; eta: %s' % (epoch, eta))
-        
-        wandb.log({"Epoch time": accum_epoch_time(), "Epoch": epoch}, step=model.global_count)
+        wandb.log({"Epoch": epoch}, step=model.global_count)
 
         if epoch % eval_interval == True or epoch == stop_epoch - 1: 
             model.eval()
@@ -90,12 +90,22 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
             torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile_2)
             wandb.save(outfile_2)
 
+            
+    pbar.close()
     # only two models are uploaded in each run - the best one and the last one
     # return model
 
 if __name__=='__main__':
+      
+   
+    params = parse_args('train')
+
+    if not params.committed:
+        print("Commit the code and then execute with the --committed arg")
+        exit()
+        
     """Set seed"""
-    seed = 42
+    seed = params.seed
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -105,13 +115,6 @@ if __name__=='__main__':
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
     os.environ["PYTHONHASHSEED"] = str(seed)
-    
-   
-    params = parse_args('train')
-
-    if not params.committed:
-        print("Commit the code and then execute with the --committed arg")
-        exit()
 
 
     os.environ["CUDA_VISIBLE_DEVICES"] = params.device
