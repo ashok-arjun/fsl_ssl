@@ -54,6 +54,9 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
         eta = str(datetime.timedelta(seconds = int(accum_epoch_time() * (stop_epoch - epoch))))        
         
         wandb.log({"Epoch": epoch}, step=model.global_count)
+        wandb.log({"Epoch Time": accum_epoch_time()}, step=model.global_count)
+
+        print("Done with epoch: %d; Time taken: %d" % (epoch, accum_epoch_time()))
 
         if epoch % eval_interval == True or epoch == stop_epoch - 1: 
             model.eval()

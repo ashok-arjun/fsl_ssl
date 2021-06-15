@@ -12,20 +12,20 @@ import random
 
 """JUST SETTING SEED"""
 
-from io_utils import parse_args
+# from io_utils import parse_args
 
-params = parse_args('train')
+# params = parse_args('train')
 
-seed = params.seed
-random.seed(seed)
-np.random.seed(seed)
-torch.manual_seed(seed)
-if torch.cuda.is_available():
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-os.environ["PYTHONHASHSEED"] = str(seed)
+# seed = params.seed
+# random.seed(seed)
+# np.random.seed(seed)
+# torch.manual_seed(seed)
+# if torch.cuda.is_available():
+#     torch.cuda.manual_seed(seed)
+#     torch.cuda.manual_seed_all(seed)
+#     torch.backends.cudnn.deterministic = True
+#     torch.backends.cudnn.benchmark = False
+# os.environ["PYTHONHASHSEED"] = str(seed)
 
 """DONE"""
 

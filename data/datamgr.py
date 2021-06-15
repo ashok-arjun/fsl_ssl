@@ -15,20 +15,20 @@ NUM_WORKERS=8
 
 """JUST SETTING SEED"""
 
-from io_utils import parse_args
+# from io_utils import parse_args
 
-params = parse_args('train')
+# params = parse_args('train')
 
-seed = params.seed
-random.seed(seed)
-np.random.seed(seed)
-torch.manual_seed(seed)
-if torch.cuda.is_available():
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-os.environ["PYTHONHASHSEED"] = str(seed)
+# seed = params.seed
+# random.seed(seed)
+# np.random.seed(seed)
+# torch.manual_seed(seed)
+# if torch.cuda.is_available():
+#     torch.cuda.manual_seed(seed)
+#     torch.cuda.manual_seed_all(seed)
+#     torch.backends.cudnn.deterministic = True
+#     torch.backends.cudnn.benchmark = False
+# os.environ["PYTHONHASHSEED"] = str(seed)
 
 """DONE"""
 
@@ -153,6 +153,8 @@ class SetDataManager(DataManager):
         self.image_size = image_size
         self.n_way = n_way
         self.batch_size = n_support + n_query
+        print("Set data manager -  Batch size of one class: %d; %d-way classes, hence total batch size: %d" \
+            % (self.batch_size, n_way, self.batch_size * self.n_way))
         self.n_eposide = n_eposide
 
         if grey:

@@ -12,6 +12,9 @@ from itertools import cycle
 
 import wandb
 
+from iterlib import thread_preload
+
+
 class ProtoNet(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, jigsaw=False, lbda=0.0, rotation=False, tracking=False, use_bn=True, pretrain=False):
         super(ProtoNet, self).__init__(model_func,  n_way, n_support, use_bn, pretrain, tracking=tracking)
@@ -58,6 +61,9 @@ class ProtoNet(MetaTemplate):
 
         self.global_count = epoch * len(train_loader)
         
+        max_iter = len(train_loader)
+        print("Total number of batches: ", max_iter)    
+
         # Uncomment the below and shift, add an else: when using unlabelled
         
 #         if base_loader_u is not None:
@@ -109,9 +115,21 @@ class ProtoNet(MetaTemplate):
 #                     else:
 #                         print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i+1, len(train_loader), avg_loss/float(i+1)))
 #         else:
-        for i, inputs in enumerate(train_loader):
+
+        iter_num = 0 
+
+        while iter_num < len(train_loader):
+            try:
+                inputs = next(iter_loader)
+            except:
+                iter_loader = iter(train_loader)
+                inputs = next(iter_loader)
+
             self.global_count += 1
             x = inputs[0]
+
+            print(x.shape)
+
             self.n_query = x.size(1) - self.n_support
             if self.change_way:
                 self.n_way  = x.size(0)
@@ -149,18 +167,19 @@ class ProtoNet(MetaTemplate):
            
             pbar.update(1)
         
-            if (i+1) % print_freq==0:
+            if (iter_num+1) % print_freq==0:
                 #print(optimizer.state_dict()['param_groups'][0]['lr'])
                 if self.jigsaw:
                     pbar.write('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Jigsaw {:f}'.\
-                        format(epoch, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_proto/float(i+1), avg_loss_jigsaw/float(i+1)))
+                        format(epoch, iter_num+1, len(train_loader), avg_loss/float(iter_num+1), avg_loss_proto/float(iter_num+1), avg_loss_jigsaw/float(iter_num+1)))
                 elif self.rotation:
                     pbar.write('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Loss Proto {:f} | Loss Rotation {:f}'.\
-                        format(epoch, i+1, len(train_loader), avg_loss/float(i+1), avg_loss_proto/float(i+1), avg_loss_rotation/float(i+1)))
+                        format(epoch, iter_num+1, len(train_loader), avg_loss/float(iter_num+1), avg_loss_proto/float(iter_num+1), avg_loss_rotation/float(iter_num+1)))
                 else:
-                    pbar.write('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i+1, len(train_loader), avg_loss/float(i+1)))
+                    pbar.write('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, iter_num+1, len(train_loader), avg_loss/float(iter_num+1)))
 
-                        
+            iter_num += 1
+
     def test_loop_with_loss(self, test_loader, record = None):
         correct =0
         count = 0
