@@ -1,3 +1,9 @@
+from io_utils import parse_args
+import os
+
+params = parse_args('train')
+os.environ["CUDA_VISIBLE_DEVICES"] = params.device
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -19,7 +25,7 @@ from methods.protonet import ProtoNet
 from methods.matchingnet import MatchingNet
 from methods.relationnet import RelationNet
 from methods.maml import MAML
-from io_utils import model_dict, parse_args, get_resume_file, get_best_file, get_assigned_file
+from io_utils import model_dict, get_resume_file, get_best_file, get_assigned_file
 from tensorboardX import SummaryWriter
 import json
 from model_resnet import *
@@ -64,15 +70,15 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
                 os.makedirs(params.checkpoint_dir)
 
             if params.jigsaw:
-                acc, acc_jigsaw = model.test_loop( val_loader)
+                acc, acc_jigsaw = model.test_loop( val_loader, pbar=pbar)
                 wandb.log({"val/acc_jigsaw": acc_jigsaw}, step=model.global_count)
 #                 wandb.log({"val/loss_jigsaw": avg_loss_jigsaw}, step=model.global_count)
             elif params.rotation:
-                acc, acc_rotation = model.test_loop( val_loader)
+                acc, acc_rotation = model.test_loop( val_loader, pbar=pbar)
                 wandb.log({"val/acc_rotation": acc_rotation}, step=model.global_count)
 #                 wandb.log({"val/loss_rotation": avg_loss_rotation}, step=model.global_count)
             else:    
-                acc = model.test_loop( val_loader)
+                acc = model.test_loop( val_loader, pbar=pbar)
                 
 #             wandb.log({"val/loss_avg": avg_loss}, step=model.global_count)
 #             wandb.log({"val/loss_proto": avg_loss_proto}, step=model.global_count)
@@ -117,11 +123,7 @@ if __name__=='__main__':
         torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-    os.environ["PYTHONHASHSEED"] = str(seed)
-
-
-    os.environ["CUDA_VISIBLE_DEVICES"] = params.device
-
+    os.environ["PYTHONHASHSEED"] = str(seed)  
 
     isAircraft = (params.dataset == 'aircrafts')    
         

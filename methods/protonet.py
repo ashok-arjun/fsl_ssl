@@ -62,7 +62,6 @@ class ProtoNet(MetaTemplate):
         self.global_count = epoch * len(train_loader)
         
         max_iter = len(train_loader)
-        print("Total number of batches: ", max_iter)    
 
         # Uncomment the below and shift, add an else: when using unlabelled
         
@@ -127,9 +126,7 @@ class ProtoNet(MetaTemplate):
 
             self.global_count += 1
             x = inputs[0]
-
-            print(x.shape)
-
+            
             self.n_query = x.size(1) - self.n_support
             if self.change_way:
                 self.n_way  = x.size(0)
@@ -164,7 +161,7 @@ class ProtoNet(MetaTemplate):
             optimizer.step()
             avg_loss = avg_loss+loss.item()
             wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
-           
+
             pbar.update(1)
         
             if (iter_num+1) % print_freq==0:
@@ -247,7 +244,7 @@ class ProtoNet(MetaTemplate):
         else:
             return (acc_mean), (avg_loss, avg_loss_proto)
                         
-    def test_loop(self, test_loader, record = None):
+    def test_loop(self, test_loader, pbar, record = None):
         correct =0
         count = 0
         acc_all = []
@@ -276,18 +273,18 @@ class ProtoNet(MetaTemplate):
         acc_all  = np.asarray(acc_all)
         acc_mean = np.mean(acc_all)
         acc_std  = np.std(acc_all)
-        print('%d Test Protonet Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean, 1.96* acc_std/np.sqrt(iter_num)))
+        pbar.write('%d Test Protonet Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean, 1.96* acc_std/np.sqrt(iter_num)))
         if self.jigsaw:
             acc_all_jigsaw  = np.asarray(acc_all_jigsaw)
             acc_mean_jigsaw = np.mean(acc_all_jigsaw)
             acc_std_jigsaw  = np.std(acc_all_jigsaw)
-            print('%d Test Jigsaw Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean_jigsaw, 1.96* acc_std_jigsaw/np.sqrt(iter_num)))
+            pbar.write('%d Test Jigsaw Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean_jigsaw, 1.96* acc_std_jigsaw/np.sqrt(iter_num)))
             return acc_mean, acc_mean_jigsaw
         elif self.rotation:
             acc_all_rotation  = np.asarray(acc_all_rotation)
             acc_mean_rotation = np.mean(acc_all_rotation)
             acc_std_rotation  = np.std(acc_all_rotation)
-            print('%d Test Rotation Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean_rotation, 1.96* acc_std_rotation/np.sqrt(iter_num)))
+            pbar.write('%d Test Rotation Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean_rotation, 1.96* acc_std_rotation/np.sqrt(iter_num)))
             return acc_mean, acc_mean_rotation
         else:
             return acc_mean
