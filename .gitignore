@@ -23,4 +23,5 @@ ckpts/*
 wandb/*
 wandb/
 wandb/latest-run
-.ipynb_checkpoints/*
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
