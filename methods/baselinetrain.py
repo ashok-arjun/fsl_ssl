@@ -266,7 +266,7 @@ class BaselineTrain(nn.Module):
                     pbar.write('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Acc Cls {:f}'.format(epoch+1, i+1, \
                                     len(train_loader), avg_loss/float(i+1), avg_acc_softmax/float(i+1)  ))
                          
-    def test_loop(self, pbar, val_loader=None):
+    def test_loop(self, val_loader=None, pbar=None):
         if val_loader is not None:
             num_correct = 0
             num_total = 0
