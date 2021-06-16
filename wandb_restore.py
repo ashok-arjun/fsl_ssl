@@ -14,7 +14,7 @@ parser.add_argument('--path', type=str)
 args = parser.parse_args()
 
 
-wandb.init(id=args.id, project="fsl_ssl", resume=True)
+wandb.init(id=args.id, project="FSL-SSL", entity="meta-learners", resume=True)
 
 wandb_path = wandb.restore(args.path)
 
