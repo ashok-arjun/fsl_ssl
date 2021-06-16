@@ -51,6 +51,9 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
 
     pbar = tqdm(range(0, stop_epoch*len(base_loader)), total = stop_epoch*len(base_loader))
     
+    pbar.update(start_epoch*len(base_loader))
+    pbar.refresh()
+    
     for epoch in range(start_epoch,stop_epoch):
         start_time = time.time()
         model.train()
