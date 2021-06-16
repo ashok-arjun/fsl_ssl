@@ -12,6 +12,17 @@ from itertools import cycle
 
 import wandb
 
+from io_utils import data_prefetcher
+
+try:
+    from apex.parallel import DistributedDataParallel as DDP
+    from apex.fp16_utils import *
+    from apex import amp, optimizers
+    from apex.multi_tensor_apply import multi_tensor_applier
+except ImportError:
+    raise ImportError("Please install apex from https://www.github.com/nvidia/apex to run this example.")
+
+
 class ProtoNet(MetaTemplate):
     def __init__(self, model_func,  n_way, n_support, jigsaw=False, lbda=0.0, rotation=False, tracking=False, use_bn=True, pretrain=False):
         super(ProtoNet, self).__init__(model_func,  n_way, n_support, use_bn, pretrain, tracking=tracking)
@@ -49,7 +60,7 @@ class ProtoNet(MetaTemplate):
             self.classifier_rotation.add_module('fc8',nn.Linear(128, 4))
 
 
-    def train_loop(self, epoch, train_loader, optimizer, base_loader_u=None, pbar=None):
+    def train_loop(self, epoch, train_loader, optimizer, base_loader_u=None, pbar=None, enable_amp=None):
         print_freq = len(train_loader)
         avg_loss=0
         avg_loss_proto=0
@@ -113,15 +124,13 @@ class ProtoNet(MetaTemplate):
 #         else:
 
         iter_num = 0 
-
-        iter_loader = iter(train_loader)
-    
+   
         while iter_num < max_iter:
             try:
-                inputs = next(iter_loader)
+                inputs = iter_loader.next()
             except:
-                iter_loader = iter(train_loader)
-                inputs = next(iter_loader)
+                iter_loader = data_prefetcher(train_loader)
+                inputs = iter_loader.next()
 
             self.global_count += 1
             x = inputs[0]
@@ -156,7 +165,12 @@ class ProtoNet(MetaTemplate):
                 wandb.log({'train/loss_proto': float(loss_proto.data.item())}, step=self.global_count)
                 wandb.log({'train/acc_proto': acc}, step=self.global_count)
 
-            loss.backward()
+            if enable_amp:
+                with amp.scale_loss(loss, optimizer) as scaled_loss:
+                    scaled_loss.backward()
+            else:
+                loss.backward()
+
             optimizer.step()
             avg_loss = avg_loss+loss.item()
             wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
@@ -227,18 +241,18 @@ class ProtoNet(MetaTemplate):
         avg_loss_jigsaw = avg_loss_jigsaw / iter_num
         avg_loss_rotation = avg_loss_rotation / iter_num
         
-        print('%d Test Protonet Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean, 1.96* acc_std/np.sqrt(iter_num)))
+        pbar.write('%d Test Protonet Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean, 1.96* acc_std/np.sqrt(iter_num)))
         if self.jigsaw:
             acc_all_jigsaw  = np.asarray(acc_all_jigsaw)
             acc_mean_jigsaw = np.mean(acc_all_jigsaw)
             acc_std_jigsaw  = np.std(acc_all_jigsaw)
-            print('%d Test Jigsaw Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean_jigsaw, 1.96* acc_std_jigsaw/np.sqrt(iter_num)))
+            pbar.write('%d Test Jigsaw Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean_jigsaw, 1.96* acc_std_jigsaw/np.sqrt(iter_num)))
             return (acc_mean, acc_mean_jigsaw), (avg_loss, avg_loss_proto, avg_loss_jigsaw)
         elif self.rotation:
             acc_all_rotation  = np.asarray(acc_all_rotation)
             acc_mean_rotation = np.mean(acc_all_rotation)
             acc_std_rotation  = np.std(acc_all_rotation)
-            print('%d Test Rotation Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean_rotation, 1.96* acc_std_rotation/np.sqrt(iter_num)))
+            pbar.write('%d Test Rotation Acc = %4.2f%% +- %4.2f%%' %(iter_num,  acc_mean_rotation, 1.96* acc_std_rotation/np.sqrt(iter_num)))
             return (acc_mean, acc_mean_rotation), (avg_loss, avg_loss_proto, avg_loss_rotation)
         else:
             return (acc_mean), (avg_loss, avg_loss_proto)
@@ -251,7 +265,14 @@ class ProtoNet(MetaTemplate):
         acc_all_rotation = []
 
         iter_num = len(test_loader)
-        for i, inputs in enumerate(test_loader):
+        i = 0 
+        while i < iter_num:
+            i += 1 
+            try:
+                inputs = iter_loader.next()
+            except:
+                iter_loader = data_prefetcher(test_loader)
+                inputs = iter_loader.next()
             x = inputs[0]
             self.n_query = x.size(1) - self.n_support
             if self.change_way:

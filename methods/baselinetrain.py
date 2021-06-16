@@ -11,6 +11,16 @@ from resnet_pytorch import *
 
 import wandb
 
+from io_utils import data_prefetcher
+
+try:
+    from apex.parallel import DistributedDataParallel as DDP
+    from apex.fp16_utils import *
+    from apex import amp, optimizers
+    from apex.multi_tensor_apply import multi_tensor_applier
+except ImportError:
+    raise ImportError("Please install apex from https://www.github.com/nvidia/apex to run this example.")
+
 class BaselineTrain(nn.Module):
     def __init__(self, model_func, num_class, loss_type = 'softmax', jigsaw=False, lbda=0.0, rotation=False, tracking=True, pretrain=False):
         super(BaselineTrain, self).__init__()
@@ -138,7 +148,7 @@ class BaselineTrain(nn.Module):
         else:
             return self.loss_fn(scores, y), acc
     
-    def train_loop(self, epoch, train_loader, optimizer, scheduler=None, base_loader_u=None, pbar=None):
+    def train_loop(self, epoch, train_loader, optimizer, scheduler=None, base_loader_u=None, pbar=None, enable_amp=None):
         print_freq = len(train_loader)
         avg_loss=0
         avg_loss_softmax=0
@@ -207,7 +217,14 @@ class BaselineTrain(nn.Module):
 #                                         len(train_loader), avg_loss/float(i+1), avg_acc_softmax/float(i+1)  ))
 
 #         else:
-        for i, inputs in enumerate(train_loader):
+        i = 0 
+        max_iter = len(train_loader)
+        while i < max_iter:
+            try:
+                inputs = iter_loader.next()
+            except:
+                iter_loader = data_prefetcher(train_loader)
+                inputs = iter_loader.next()
             self.global_count += 1
             x = inputs[0]
             y = inputs[1]
@@ -244,7 +261,14 @@ class BaselineTrain(nn.Module):
             avg_loss = avg_loss+loss.data
             avg_acc_softmax = avg_acc_softmax+acc                
             wandb.log({'train/loss': float(loss.data.item())}, step=self.global_count)
-            loss.backward()
+
+
+            if enable_amp:
+                with amp.scale_loss(loss, optimizer) as scaled_loss:
+                    scaled_loss.backward()
+            else:
+                loss.backward()
+            
             optimizer.step()
 
             if scheduler is not None:
@@ -265,6 +289,7 @@ class BaselineTrain(nn.Module):
                 else:
                     pbar.write('Epoch {:d} | Batch {:d}/{:d} | Loss {:f} | Acc Cls {:f}'.format(epoch+1, i+1, \
                                     len(train_loader), avg_loss/float(i+1), avg_acc_softmax/float(i+1)  ))
+            i += 1
                          
     def test_loop(self, val_loader=None, pbar=None):
         if val_loader is not None:
@@ -272,7 +297,15 @@ class BaselineTrain(nn.Module):
             num_total = 0
             num_correct_jigsaw = 0
             num_total_jigsaw = 0
-            for i, inputs in enumerate(val_loader):
+            iter_num = len(val_loader)
+            i = 0 
+            while i < iter_num:
+                i += 1 
+                try:
+                    inputs = iter_loader.next()
+                except:
+                    iter_loader = data_prefetcher(val_loader)
+                    inputs = iter_loader.next()
                 x = inputs[0]
                 y = inputs[1]
                 if self.jigsaw:

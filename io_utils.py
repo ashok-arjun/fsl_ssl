@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 import os
 import glob
 import argparse
@@ -56,7 +57,7 @@ def parse_args(script):
     # parser.add_argument("--device_ids", nargs="+", required=True, type=int) # [0] can be set as default
 
     parser.add_argument('--committed', action='store_true')
-    parser.add_argument('-seed', type=int, default=42)
+    parser.add_argument('--seed', type=int, default=42)
 
     if script == 'train':
         parser.add_argument('--num_classes' , default=200, type=int,help='total number of classes in softmax, only used in baseline') #make it larger than the maximum label value in base class
@@ -68,6 +69,7 @@ def parse_args(script):
         parser.add_argument('--warmup'      , action='store_true',  help='continue from baseline, neglected if resume is true') #never used in the paper
         parser.add_argument('--device'      ,  default="0", type=str, help='GPU id')
         parser.add_argument('--eval_interval', default=20)
+        parser.add_argument('--amp', action='store_true', default=False)
 
     parser.add_argument('--layer', default=-1, type=int)
         
@@ -95,3 +97,38 @@ def get_best_file(checkpoint_dir):
         return best_file
     else:
         return get_resume_file(checkpoint_dir)
+
+class data_prefetcher():
+    def __init__(self, loader):
+        self.loader = iter(loader)
+        self.stream = torch.cuda.Stream()
+        self.preload()
+
+    def preload(self):
+        try:
+            self.inputs = list(next(self.loader))
+        except StopIteration:
+            self.inputs = None
+            return
+        with torch.cuda.stream(self.stream):
+            for i,tensor in enumerate(self.inputs):
+                self.inputs[i] = self.inputs[i].cuda(non_blocking=True)
+
+    def next(self):
+        torch.cuda.current_stream().wait_stream(self.stream)
+        input = self.inputs[0]
+        target = self.inputs[1]
+        aux_input = self.inputs[2] if len(self.inputs) == 4 else None
+        aux_label = self.inputs[3] if len(self.inputs) == 4 else None
+
+        if input is not None:
+            input.record_stream(torch.cuda.current_stream())
+        if target is not None:
+            target.record_stream(torch.cuda.current_stream())
+        if aux_input is not None:
+            aux_input.record_stream(torch.cuda.current_stream())
+        if aux_label is not None:
+            aux_label.record_stream(torch.cuda.current_stream())
+            
+        self.preload()
+        return input, target, aux_input, aux_label

@@ -33,6 +33,13 @@ from utils import RunningAverage
 
 import wandb
 
+try:
+    from apex.parallel import DistributedDataParallel as DDP
+    from apex.fp16_utils import *
+    from apex import amp, optimizers
+    from apex.multi_tensor_apply import multi_tensor_applier
+except ImportError:
+    raise ImportError("Please install apex from https://www.github.com/nvidia/apex to run this example.")
 
 def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):    
     if params.optimization == 'Adam':
@@ -43,6 +50,10 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
         optimizer = torch.optim.SGD(model.parameters(), lr=params.lr, nesterov=True, momentum=0.9, weight_decay=params.wd)
     else:
        raise ValueError('Unknown optimization, please define by yourself')
+
+    if params.amp:
+        print("-----------Using mixed precision-----------") 
+        model, optimizer = amp.initialize(model, optimizer)
 
     eval_interval = params.eval_interval
     max_acc = 0       
@@ -57,7 +68,7 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
     for epoch in range(start_epoch,stop_epoch):
         start_time = time.time()
         model.train()
-        model.train_loop(epoch, base_loader, optimizer, pbar=pbar) # CHECKED 
+        model.train_loop(epoch, base_loader, optimizer, pbar=pbar, enable_amp=params.amp) # CHECKED 
         end_time = time.time()
         accum_epoch_time.update(end_time - start_time)
         eta = str(datetime.timedelta(seconds = int(accum_epoch_time() * (stop_epoch - epoch))))        
@@ -65,7 +76,7 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
         wandb.log({"Epoch": epoch}, step=model.global_count)
         wandb.log({"Epoch Time": accum_epoch_time()}, step=model.global_count)
 
-        print("Done with epoch: %d; Time taken: %d" % (epoch, accum_epoch_time()))
+        pbar.write("Done with epoch: %d; Time taken: %d" % (epoch, accum_epoch_time()))
 
         if epoch % eval_interval == True or epoch == stop_epoch - 1: 
             model.eval()
@@ -88,7 +99,7 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
             wandb.log({"val/acc": acc}, step=model.global_count)
             
             if acc > max_acc : #for baseline and baseline++, we don't use validation here so we let acc = -1
-                print("best model! save...")
+                pbar.write("best model! save...")
                 max_acc = acc
                 outfile = os.path.join(params.checkpoint_dir, 'best_model.tar')
                 torch.save({'epoch':epoch, 'state':model.state_dict(), 'optimizer': optimizer.state_dict()}, outfile)
@@ -285,9 +296,6 @@ if __name__=='__main__':
     else:
         print('Fresh wandb run')
         wandb.init(config=vars(params), project="FSL-SSL", entity="meta-learners")
-
-    
-    print("About to start training. Last model and best model will be saved in wandb at every model save. \n Run save_features.py and test.py after the training completes, with the same arguments")
     
     train(base_loader, val_loader,  model, start_epoch, stop_epoch, params)
 
