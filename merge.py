@@ -1,12 +1,19 @@
 import os
 import shutil
 
-subfolders = os.listdir("miniImageNet/images")
+"""miniImageNet"""
 
-print(subfolders)
+root = "./filelists/miniImagenet/images"
 
-for folder in subfolders:
-    files = os.listdir(os.path.join("miniImageNet/images", folder))
+"""tieredImageNet"""
+
+root = "./filelists/tieredImagenet/images/train" # repeat with val, test
+
+
+subdirectories = [root + x for x in os.listdir(root)]
+
+for subdir in subdirectories:
+    files = [subdir + "/" + x for x in os.listdir(subdir)]
     for file in files:
-        shutil.move(os.path.join("miniImageNet/images/"+folder, file), "miniImageNet/images/"+file)
-    os.rmdir(os.path.join("miniImageNet/images", folder))
+        shutil.move(file, root)
+    os.rmdir(subdir)

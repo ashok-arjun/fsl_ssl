@@ -123,10 +123,6 @@ if __name__=='__main__':
    
     params = parse_args('train')
 
-    if not params.committed:
-        print("Commit the code and then execute with the --committed arg")
-        exit()
-        
     """Set seed"""
     seed = params.seed
     random.seed(seed)
@@ -297,6 +293,8 @@ if __name__=='__main__':
         print('Fresh wandb run')
         wandb.init(config=vars(params), project="FSL-SSL", entity="meta-learners")
     
+    wandb.watch(model)
+
     train(base_loader, val_loader,  model, start_epoch, stop_epoch, params)
 
 
