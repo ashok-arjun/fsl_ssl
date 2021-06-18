@@ -5,11 +5,6 @@ import shutil
 
 root = "./filelists/miniImagenet/images"
 
-"""tieredImageNet"""
-
-root = "./filelists/tieredImagenet/images/train" # repeat with val, test
-
-
 subdirectories = [root + x for x in os.listdir(root)]
 
 for subdir in subdirectories:

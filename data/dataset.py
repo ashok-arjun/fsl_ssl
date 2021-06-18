@@ -113,21 +113,14 @@ class SimpleDataset:
         if img is None or target is None:
             raise Exception("Image or Target is none in dataset.py")
 
-        if self.jigsaw:
-            if self.return_name:
-                return img, target, patches, order, image_path
-            else:
-                return img, target, patches, order
-        elif self.rotation:
-            if self.return_name:
-                return img, target, torch.stack(rotated_imgs, dim=0), rotation_labels, image_path
-            else:
-                return img, target, torch.stack(rotated_imgs, dim=0), rotation_labels
+        if self.jigsaw and not self.rotation:
+            return img, target, patches, order
+        elif self.rotation and not self.jigsaw:
+            return img, target, torch.stack(rotated_imgs, dim=0), rotation_labels
+        elif self.rotation and self.jigsaw:
+            return img, target, patches, order, torch.stack(rotated_imgs, dim=0), rotation_labels
         else:
-            if self.return_name:
-                return img, target, image_path
-            else:
-                return img, target
+            return img, target
 
     def __len__(self):
         return len(self.meta['image_names'])
@@ -214,10 +207,12 @@ class SubDataset:
         img = self.transform(img)
         target = self.target_transform(self.cl)
         
-        if self.jigsaw:
+        if self.jigsaw and not self.rotation:
             return img, target, patches, order
-        elif self.rotation:
+        elif self.rotation and not self.jigsaw:
             return img, target, torch.stack(rotated_imgs, dim=0), rotation_labels
+        elif self.rotation and self.jigsaw:
+            return img, target, patches, order, torch.stack(rotated_imgs, dim=0), rotation_labels
         else:
             return img, target
 

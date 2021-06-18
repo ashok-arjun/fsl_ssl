@@ -55,30 +55,28 @@ class BaselineTrain(nn.Module):
         self.loss_fn = nn.CrossEntropyLoss()
         self.global_count = 0
 
-        if self.jigsaw:
+        if self.jigsaw or self.rotation:
             self.fc6 = nn.Sequential()
             self.fc6.add_module('fc6_s1',nn.Linear(512, 512))#for resnet
             self.fc6.add_module('relu6_s1',nn.ReLU(inplace=True))
             self.fc6.add_module('drop6_s1',nn.Dropout(p=0.5))
+            
+        if self.jigsaw:
 
-            self.fc7 = nn.Sequential()
-            self.fc7.add_module('fc7',nn.Linear(9*512,4096))#for resnet
-            self.fc7.add_module('relu7',nn.ReLU(inplace=True))
-            self.fc7.add_module('drop7',nn.Dropout(p=0.5))
+            self.fc7_jigsaw = nn.Sequential()
+            self.fc7_jigsaw.add_module('fc7',nn.Linear(9*512,4096))#for resnet
+            self.fc7_jigsaw.add_module('relu7',nn.ReLU(inplace=True))
+            self.fc7_jigsaw.add_module('drop7',nn.Dropout(p=0.5))
 
             self.classifier_jigsaw = nn.Sequential()
             self.classifier_jigsaw.add_module('fc8',nn.Linear(4096, 35))
 
         if self.rotation:
-            self.fc6 = nn.Sequential()
-            self.fc6.add_module('fc6_s1',nn.Linear(512, 512))#for resnet
-            self.fc6.add_module('relu6_s1',nn.ReLU(inplace=True))
-            self.fc6.add_module('drop6_s1',nn.Dropout(p=0.5))
 
-            self.fc7 = nn.Sequential()
-            self.fc7.add_module('fc7',nn.Linear(512,128))#for resnet
-            self.fc7.add_module('relu7',nn.ReLU(inplace=True))
-            self.fc7.add_module('drop7',nn.Dropout(p=0.5))
+            self.fc7_rotation = nn.Sequential()
+            self.fc7_rotation.add_module('fc7',nn.Linear(512,128))#for resnet
+            self.fc7_rotation.add_module('relu7',nn.ReLU(inplace=True))
+            self.fc7_rotation.add_module('drop7',nn.Dropout(p=0.5))
 
             self.classifier_rotation = nn.Sequential()
             self.classifier_rotation.add_module('fc8',nn.Linear(128, 4))
@@ -119,7 +117,7 @@ class BaselineTrain(nn.Module):
                 x_list.append(z)
 
             x_ = torch.cat(x_list,1)#torch.Size([16, 9, 512])
-            x_ = self.fc7(x_.view(B,-1))#torch.Size([16, 9*512])
+            x_ = self.fc7_jigsaw(x_.view(B,-1))#torch.Size([16, 9*512])
             x_ = self.classifier_jigsaw(x_)
 
             y_ = patches_label.view(-1).cuda()
@@ -136,7 +134,7 @@ class BaselineTrain(nn.Module):
             x_ = self.feature(patches)#torch.Size([64, 512, 1, 1])
             x_ = x_.squeeze()
             x_ = self.fc6(x_)
-            x_ = self.fc7(x_)#64,128
+            x_ = self.fc7_rotation(x_)#64,128
             x_ = self.classifier_rotation(x_)#64,4
             pred = torch.max(x_,1)
             y_ = patches_label.view(-1).cuda()
