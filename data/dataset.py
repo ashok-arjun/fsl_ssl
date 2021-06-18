@@ -110,6 +110,9 @@ class SimpleDataset:
         img = self.transform(img)
         target = self.target_transform(self.meta['image_labels'][i])
 
+        if img is None or target is None:
+            raise Exception("Image or Target is none in dataset.py")
+
         if self.jigsaw:
             if self.return_name:
                 return img, target, patches, order, image_path
@@ -216,7 +219,7 @@ class SubDataset:
         elif self.rotation:
             return img, target, torch.stack(rotated_imgs, dim=0), rotation_labels
         else:
-            return img, target, None, None
+            return img, target
 
     def __len__(self):
         return len(self.sub_meta)
