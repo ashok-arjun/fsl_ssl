@@ -20,6 +20,16 @@ model_dict = dict(
             resnet50_pytorch = 'resnet50_pytorch'
             ) 
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 def parse_args(script):
     parser = argparse.ArgumentParser(description= 'few-shot script %s' %(script))
     parser.add_argument('--dataset'     , default='dogs',            help='CUB/cars/flowers/dogs/aircrafts/miniImagenet/tieredImagenet')
@@ -40,7 +50,7 @@ def parse_args(script):
     parser.add_argument('--image_size'  , default=224, type=int,    help='224 is used in the paper')
     parser.add_argument('--date'        , default='', type=str,     help='date of the exp')
     parser.add_argument('--rotation'    , action='store_true',      help='multi-task training')
-    parser.add_argument('--tracking'    , action='store_true', default=True,     help='tracking batchnorm stats')
+    parser.add_argument('--tracking'    , type=str2bool, nargs='?', default=True, const=True,   help='tracking batchnorm stats')
     parser.add_argument('--split'        , default='novel',         help='base/val/novel') #default novel, but you can also test base/val class accuracy if you want 
     parser.add_argument('--save_iter'    , default=-1, type=int,    help='saved feature from the model trained in x epoch, use the best model if x is -1')
     parser.add_argument('--adaptation'   , action='store_true',     help='further adaptation in test time or not')
@@ -132,3 +142,8 @@ class data_prefetcher():
             
         self.preload()
         return input, target, aux_input, aux_label
+
+
+if __name__ == "__main__":
+    args = parse_args('train')
+    print(args)
