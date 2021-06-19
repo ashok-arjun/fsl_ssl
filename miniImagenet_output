@@ -1,0 +1,28 @@
+checkpoint_dir: ckpts/miniImagenet/_resnet18_protonet_aug_5way_5shot_16query_tracking_lr0.0010
+USE BN: True
+Selected optimization level O1:  Insert automatic casts around Pytorch functions and Tensor methods.
+
+Defaults for this optimization level are:
+enabled                : True
+opt_level              : O1
+cast_model_type        : None
+patch_torch_functions  : True
+keep_batchnorm_fp32    : None
+master_weights         : None
+loss_scale             : dynamic
+Processing user overrides (additional kwargs that are not None)...
+After processing overrides, optimization options are:
+enabled                : True
+opt_level              : O1
+cast_model_type        : None
+patch_torch_functions  : True
+keep_batchnorm_fp32    : None
+master_weights         : None
+loss_scale             : dynamic
+outfile is features/miniImagenet/_resnet18_protonet_aug_5way_5shot_16query_tracking_lr0.0010/novel.hdf5
+0/188
+10/188
+20/188
+30/188
+40/188
+50/188
