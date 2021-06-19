@@ -46,6 +46,18 @@ def feature_evaluation(cl_data_file, model, n_way = 5, n_support = 5, n_query = 
 if __name__ == '__main__':
     params = parse_args('test')
 
+    """Set seed"""
+    seed = params.seed
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    os.environ["PYTHONHASHSEED"] = str(seed)  
+
     print("Testing involves fine-tuning. Commit after testing.")
     
     isAircraft = (params.dataset == 'aircrafts')
