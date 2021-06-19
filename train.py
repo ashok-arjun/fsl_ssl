@@ -17,6 +17,8 @@ import random
 import datetime
 from tqdm import tqdm
 
+torch.cuda.set_device(0)
+
 import backbone
 from data.datamgr import SimpleDataManager, SetDataManager
 from methods.baselinetrain import BaselineTrain
