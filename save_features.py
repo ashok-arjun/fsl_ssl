@@ -16,6 +16,15 @@ from methods.maml import MAML
 from io_utils import model_dict, parse_args, get_resume_file, get_best_file, get_assigned_file
 from model_resnet import *
 
+try:
+    from apex.parallel import DistributedDataParallel as DDP
+    from apex.fp16_utils import *
+    from apex import amp, optimizers
+    from apex.multi_tensor_apply import multi_tensor_applier
+except ImportError:
+    raise ImportError("Please install apex from https://www.github.com/nvidia/apex to run this example.")
+
+
 def save_features(model, data_loader, outfile ):
     f = h5py.File(outfile, 'w')
     max_count = len(data_loader)*data_loader.batch_size
@@ -129,6 +138,9 @@ if __name__ == '__main__':
     model = model.cuda()
     if params.method != 'baseline':
         model.feature = model.feature.cuda()
+
+    if params.amp:
+        model = amp.initialize(model)
 
     tmp = torch.load(modelfile)
     state = tmp['state']

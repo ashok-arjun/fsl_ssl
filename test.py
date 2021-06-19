@@ -21,6 +21,14 @@ from methods.relationnet import RelationNet
 from methods.maml import MAML
 from io_utils import model_dict, parse_args, get_resume_file, get_best_file , get_assigned_file
 
+try:
+    from apex.parallel import DistributedDataParallel as DDP
+    from apex.fp16_utils import *
+    from apex import amp, optimizers
+    from apex.multi_tensor_apply import multi_tensor_applier
+except ImportError:
+    raise ImportError("Please install apex from https://www.github.com/nvidia/apex to run this example.")
+
 def feature_evaluation(cl_data_file, model, n_way = 5, n_support = 5, n_query = 15, adaptation = False):
     class_list = cl_data_file.keys()
 
@@ -106,6 +114,9 @@ if __name__ == '__main__':
 
     model = model.cuda()
     model.feature = model.feature.cuda()
+
+    if params.amp:
+        model = amp.initialize(amp)
 
     checkpoint_dir = 'ckpts/%s/%s_%s_%s' %(params.dataset, params.date, params.model, params.method)
     if params.train_aug:
