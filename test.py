@@ -112,11 +112,13 @@ if __name__ == '__main__':
     else:
        raise ValueError('Unknown method')
 
+    
     model = model.cuda()
     model.feature = model.feature.cuda()
 
     if params.amp:
-        model = amp.initialize(amp)
+        model = amp.initialize(model)
+   
 
     checkpoint_dir = 'ckpts/%s/%s_%s_%s' %(params.dataset, params.date, params.model, params.method)
     if params.train_aug:
