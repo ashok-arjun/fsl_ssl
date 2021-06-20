@@ -181,7 +181,7 @@ if __name__=='__main__':
         base_loader             = base_datamgr.get_data_loader( base_file , aug = params.train_aug )
          
         test_few_shot_params     = dict(n_way = params.test_n_way, n_support = params.n_shot, \
-                                        jigsaw=params.jigsaw, lbda=params.lbda, rotation=params.rotation) 
+                                        jigsaw=params.jigsaw, lbda=params.lbda, rotation=params.rotation, n_eposide=600) # better validation 
         val_datamgr             = SetDataManager(image_size, n_query = n_query, **test_few_shot_params, isAircraft=isAircraft)
         val_loader              = val_datamgr.get_data_loader( val_file, aug = False) 
 
