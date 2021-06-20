@@ -284,10 +284,7 @@ if __name__=='__main__':
         model.load_state_dict(pretrained_dict, strict=False)
 
     json.dump(vars(params), open(params.checkpoint_dir+'/configs.json','w'))
-    
-    
-    # Init WANDB
-    
+        
     if params.resume_wandb_id:
         print('Resuming from wandb ID: ', params.resume_wandb_id)
         wandb.init(config=vars(params), project="FSL-SSL", entity="meta-learners", id=params.resume_wandb_id, resume=True)
@@ -301,7 +298,7 @@ if __name__=='__main__':
 
 
 #     ##### from save_features.py (except maml)#####
-#     split = 'novel'
+#     split = 'val'
 #     if params.save_iter != -1:
 #         split_str = split + "_" +str(params.save_iter)
 #     else:
@@ -338,7 +335,7 @@ if __name__=='__main__':
 #         print('modelfile:',modelfile)
 
 #         datamgr          = SetDataManager(image_size, n_eposide = iter_num, n_query = 15 , **few_shot_params, isAircraft=isAircraft)
-#         loadfile         = os.path.join('filelists', params.dataset, 'novel.json')
+#         loadfile         = os.path.join('filelists', params.dataset, '%s.json' % (split))
 #         novel_loader     = datamgr.get_data_loader( loadfile, aug = False)
 #         if params.adaptation:
 #             model.task_update_num = 100 #We perform adaptation on MAML simply by updating more times.
@@ -346,12 +343,12 @@ if __name__=='__main__':
 #         acc_mean, acc_std = model.test_loop( novel_loader, return_std = True)
 #     else:
 #         if params.save_iter != -1:
-#             outfile = os.path.join( checkpoint_dir.replace("ckpts","features"), "novel_" + str(params.save_iter)+ ".hdf5")
+#             outfile = os.path.join( checkpoint_dir.replace("ckpts","features"), "%s_" % (split) + str(params.save_iter)+ ".hdf5")
 #         else:
-#             outfile = os.path.join( checkpoint_dir.replace("ckpts","features"), "novel.hdf5")
+#             outfile = os.path.join( checkpoint_dir.replace("ckpts","features"), "%s.hdf5" % (split))
 
 #         datamgr          = SimpleDataManager(image_size, batch_size = params.test_bs, isAircraft=isAircraft)
-#         loadfile         = os.path.join('filelists', params.dataset, 'novel.json')
+#         loadfile         = os.path.join('filelists', params.dataset, '%s.json' % (split))
 #         data_loader      = datamgr.get_data_loader(loadfile, aug = False)
 
 #         tmp = torch.load(modelfile)
@@ -376,7 +373,7 @@ if __name__=='__main__':
 #         from save_features import save_features
 #         save_features(model, data_loader, outfile)
 
-#         ### from test.py ###
+# #         ### from test.py ###
 #         from test import feature_evaluation
 #         novel_file = os.path.join( checkpoint_dir.replace("ckpts","features"), split_str +".hdf5") #defaut split = novel, but you can also test base or val classes
 #         print('load novel file from:',novel_file)

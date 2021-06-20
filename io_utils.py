@@ -32,13 +32,13 @@ def str2bool(v):
 
 def parse_args(script):
     parser = argparse.ArgumentParser(description= 'few-shot script %s' %(script))
-    parser.add_argument('--dataset'     , default='dogs',            help='CUB/cars/flowers/dogs/aircrafts/miniImagenet/tieredImagenet')
+    parser.add_argument('--dataset'     , default='miniImagenet',            help='CUB/cars/flowers/dogs/aircrafts/miniImagenet/tieredImagenet')
     parser.add_argument('--model'       , default='resnet18',       help='model: Conv{4|6} / ResNet{10|18|34|50|101}') # 50 and 101 are not used in the paper
     parser.add_argument('--method'      , default='protonet',       help='baseline/baseline++/protonet/matchingnet/relationnet{_softmax}/maml{_approx}') #relationnet_softmax replace L2 norm with softmax to expedite training, maml_approx use first-order approximation in the gradient for efficiency
     parser.add_argument('--train_n_way' , default=5, type=int,      help='class num to classify for training') #baseline and baseline++ would ignore this parameter
     parser.add_argument('--test_n_way'  , default=5, type=int,      help='class num to classify for testing (validation) ') #baseline and baseline++ only use this parameter in finetuning
     parser.add_argument('--n_shot'      , default=5, type=int,      help='number of labeled data in each class, same as n_support') #baseline and baseline++ only use this parameter in finetuning
-    parser.add_argument('--train_aug'   , action='store_true',      help='perform data augmentation or not during training ') #still required for save_features.py and test.py to find the model path correctly
+    parser.add_argument('--train_aug'   , type=str2bool, nargs='?', default=True, const=True,   help='perform data augmentation or not during training ') #still required for save_features.py and test.py to find the model path correctly
     parser.add_argument('--jigsaw'      , action='store_true',      help='multi-task training')
     parser.add_argument('--lbda'        , default=0.5, type=float,  help='lambda for the jigsaw loss, (1-lambda) for proto loss')
     parser.add_argument('--lr'          , default=0.001, type=float,help='learning rate')
@@ -56,8 +56,8 @@ def parse_args(script):
     parser.add_argument('--adaptation'   , action='store_true',     help='further adaptation in test time or not')
 
     parser.add_argument('--bs'          , default=16, type=int,     help='batch size used for unlabeled dataset, also when method==baseline')
-    parser.add_argument('--no_bn'        , action='store_true',     help='not using batch norm if True')
-    parser.add_argument('--pretrain'     , action='store_true',     help='use imagenet pre-train model')
+    parser.add_argument('--no_bn'       , type=str2bool, nargs='?', default=False, const=True,   help='not using batch norm if True')
+    parser.add_argument('--pretrain'    , type=str2bool, nargs='?', default=False, const=True,   help='use imagenet pre-train model')
     parser.add_argument('--grey'     , action='store_true',         help='use grey iamge')
     parser.add_argument('--test_bs'      , default=64, type=int,    help='batch size for testing w/o batchnorm')
     parser.add_argument('--dataset_unlabel', default=None,          help='CUB/cars/flowers/dogs/aircrafts/miniImagenet/tieredImagenet')
@@ -72,7 +72,7 @@ def parse_args(script):
 
     if script == 'train':
         parser.add_argument('--num_classes' , default=200, type=int,help='total number of classes in softmax, only used in baseline') #make it larger than the maximum label value in base class
-        parser.add_argument('--save_freq'   , default=10, type=int,help='Save frequency')
+        parser.add_argument('--save_freq'   , default=50, type=int,help='Save frequency')
         parser.add_argument('--start_epoch' , default=0, type=int,  help='Starting epoch')
         parser.add_argument('--stop_epoch'  , default=600, type=int,help='Stopping epoch') # for meta-learning methods, each epoch contains 100 episodes
         parser.add_argument('--resume'      , action='store_true',  help='continue from previous trained model with largest epoch')
