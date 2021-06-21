@@ -292,6 +292,9 @@ if __name__=='__main__':
         print('Fresh wandb run')
         wandb.init(config=vars(params), project="FSL-SSL", entity="meta-learners")
     
+    wandb.run.name = wandb.run.id if not params.run_name else params.run_name
+    wandb.run.save()
+    
     wandb.watch(model)
 
     train(base_loader, val_loader,  model, start_epoch, stop_epoch, params)
