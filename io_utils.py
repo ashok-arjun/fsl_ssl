@@ -80,6 +80,7 @@ def parse_args(script):
         parser.add_argument('--warmup'      , action='store_true',  help='continue from baseline, neglected if resume is true') #never used in the paper
         parser.add_argument('--device'      ,  default="0", type=str, help='GPU id')
         parser.add_argument('--eval_interval', default=20)
+        parser.add_argument('--run_name', default=None, help="wandb run name")
 
     parser.add_argument('--layer', default=-1, type=int)
         
